@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CAMERA_REBASE_DISTANCE_M,
   createCamera,
+  flightZoomBounds,
+  followCamera,
   rebaseCamera,
   screenToWorld,
   worldToScreen,
@@ -63,5 +65,42 @@ describe('camera floating origin', () => {
     expect(zoomCamera(cam, 2, 0.001, 100).pixelsPerMeter).toBe(2);
     expect(zoomCamera(cam, 1000, 0.001, 100).pixelsPerMeter).toBe(100);
     expect(zoomCamera(cam, 0.0001, 0.001, 100).pixelsPerMeter).toBe(0.001);
+  });
+});
+
+describe('followCamera', () => {
+  it('eases the anchor toward the target without ever overshooting', () => {
+    const cam = createCamera({ x: 0, y: 0 }, 1);
+    const next = followCamera(cam, { x: 100, y: 0 }, 1, 1 / 60);
+    expect(next.anchor.x).toBeGreaterThan(0);
+    expect(next.anchor.x).toBeLessThan(100);
+  });
+
+  it('converges to the target after many small steps', () => {
+    let cam = createCamera({ x: 0, y: 0 }, 1);
+    for (let i = 0; i < 600; i++) {
+      cam = followCamera(cam, { x: 500, y: -200 }, 4, 1 / 60);
+    }
+    expect(cam.anchor.x).toBeCloseTo(500, 3);
+    expect(cam.anchor.y).toBeCloseTo(-200, 3);
+    expect(cam.pixelsPerMeter).toBeCloseTo(4, 6);
+  });
+
+  it('dt=0 leaves the camera unchanged', () => {
+    const cam = createCamera({ x: 10, y: 20 }, 2);
+    const next = followCamera(cam, { x: 999, y: 999 }, 9, 0);
+    expect(next.anchor).toEqual(cam.anchor);
+    expect(next.pixelsPerMeter).toBe(cam.pixelsPerMeter);
+  });
+});
+
+describe('flightZoomBounds', () => {
+  it('min zoom shows the whole body, max zoom shows the vessel', () => {
+    const { min, max } = flightZoomBounds(30, 1_000_000, 900);
+    expect(min).toBeLessThan(max);
+    // Zoomed all the way out, the body's diameter must fit inside the shorter viewport side.
+    expect(2 * 1_000_000 * min).toBeLessThanOrEqual(900 + 1e-6);
+    // Zoomed all the way in, a few vessel-spans must fit inside the shorter viewport side.
+    expect(30 * max).toBeGreaterThan(30);
   });
 });

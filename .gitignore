@@ -17,3 +17,6 @@ tests/e2e/screenshots/*.png
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+
+# agent worktrees (temporary, created by the harness)
+.claude/worktrees/

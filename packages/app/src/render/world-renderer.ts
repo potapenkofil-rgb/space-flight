@@ -1,19 +1,28 @@
 /**
  * The flight scene's world view: ground/sky, the body, and the vessel with
- * its engine plume (PLAN.md §7 Agent D). Renders a placeholder vessel shape
- * — `part-renderer.ts` (Agent E, PLAN.md §3.7: parses `part.svg` into
- * `Path2D`) isn't available yet, so this draws a simple capsule silhouette
- * in the same "thin chartplotter line" spirit as DESIGN.md §4 dictates for
- * real part art, clearly isolated in `drawPlaceholderVessel` so swapping in
- * the real per-part renderer later is a one-function change.
+ * its engine plume (PLAN.md §7 Agent D). Draws the real assembled vessel —
+ * one `drawPart` call per `PartInstance`, the same `Path2D` vector the
+ * hangar uses (PLAN.md §3.7) — when `options.vesselParts` is given; falls
+ * back to a placeholder capsule silhouette (`drawPlaceholderVessel`) when it
+ * isn't, so any caller without a full part list (a future non-vessel demo,
+ * a test) still gets something reasonable on screen.
  *
  * Like every render module, this only reads its arguments and draws — it
  * never mutates vessel/world state (PLAN.md §3.2).
  */
-import type { Vec2 } from '@karman/core';
+import type { PartDef, Vec2 } from '@karman/core';
+import { v2 } from '@karman/core';
+import { drawPart } from './part-renderer';
 import { getColor } from '../ui/tokens';
 import { type Camera, worldToScreen } from './camera';
 import { computePlumeShape, type PlumeStyle } from './plume';
+
+/** One part to draw, already resolved to the vessel's own local frame (metres, radians) — `PartInstance`'s shape, kept minimal so this module doesn't need to import `Vessel`. */
+export interface VesselPartView {
+  readonly def: PartDef;
+  readonly position: Vec2;
+  readonly rotation: number;
+}
 
 export interface WorldRendererOptions {
   readonly bodyCenter: Vec2;
@@ -25,6 +34,8 @@ export interface WorldRendererOptions {
   readonly throttle: number;
   readonly ambientPressure: number;
   readonly plumeStyle?: PlumeStyle;
+  /** The real assembled vessel to draw, part by part. Falls back to a placeholder capsule when omitted/empty. */
+  readonly vesselParts?: readonly VesselPartView[];
   /** Extra screen-space offset applied to everything (camera shake, PLAN.md §7 Agent D). */
   readonly shakeOffsetPx?: Vec2;
 }
@@ -53,7 +64,11 @@ export function drawBody(
   const radiusPx = radiusMeters * camera.pixelsPerMeter;
 
   ctx.save();
-  ctx.fillStyle = getColor('orbitSoft');
+  // DESIGN.md §5: radial gradient sky-hi → sky-lo — the same treatment as the map's planet disc.
+  const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, Math.max(radiusPx, 1));
+  gradient.addColorStop(0, getColor('skyHi'));
+  gradient.addColorStop(1, getColor('skyLo'));
+  ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(p.x, p.y, radiusPx, 0, Math.PI * 2);
   ctx.fill();
@@ -116,6 +131,31 @@ function drawPlaceholderVessel(
   ctx.fill();
 
   ctx.restore();
+}
+
+/**
+ * Draws the real assembled vessel, one `drawPart` call per part — same
+ * vector as the hangar (DESIGN.md §4). `vesselScreen`/`rotation` place the
+ * vessel's own origin/heading on screen; each part's `originPx` is then
+ * derived from its vessel-local `position`/`rotation` composed on top,
+ * mirroring `scenes/build/workspaceRenderer.ts`'s `drawPlacedPart` (screen Y
+ * is flipped vs. world Y, PLAN.md §3.1, hence every rotation is negated).
+ */
+function drawVesselParts(
+  ctx: CanvasRenderingContext2D,
+  camera: Camera,
+  vesselWorldPosition: Vec2,
+  vesselWorldRotationRad: number,
+  parts: readonly VesselPartView[],
+  viewportWidthPx: number,
+  viewportHeightPx: number
+): void {
+  for (const part of parts) {
+    const worldPos = v2.add(vesselWorldPosition, v2.rot(part.position, vesselWorldRotationRad));
+    const worldRotation = vesselWorldRotationRad + part.rotation;
+    const originPx = worldToScreen(camera, worldPos, viewportWidthPx, viewportHeightPx);
+    drawPart(ctx, part.def, { originPx, rotation: -worldRotation, pixelsPerMeter: camera.pixelsPerMeter });
+  }
 }
 
 /** Draws the engine plume trailing behind the vessel, sized/tinted from throttle and ambient pressure (PLAN.md §7 Agent D). */
@@ -194,7 +234,19 @@ export function drawFlightWorld(
     camera.pixelsPerMeter,
     options.plumeStyle
   );
-  drawPlaceholderVessel(ctx, vesselScreen, options.vesselRotation, screenSpanPx);
+
+  if (options.vesselParts && options.vesselParts.length > 0) {
+    // `options.vesselRotation` is the atan2-style world heading used by the
+    // plume/placeholder (see `drawPlaceholderVessel`'s doc); `@karman/core`'s
+    // own `Vessel.rotation` (what each part's local position/rotation is
+    // relative to) is a constant π/2 away from it — see
+    // `scenes/flight/flightClock.ts`'s `toSnapshot` for the forward
+    // conversion this undoes.
+    const coreRotation = options.vesselRotation - Math.PI / 2;
+    drawVesselParts(ctx, camera, options.vesselPosition, coreRotation, options.vesselParts, viewportWidthPx, viewportHeightPx);
+  } else {
+    drawPlaceholderVessel(ctx, vesselScreen, options.vesselRotation, screenSpanPx);
+  }
 
   ctx.restore();
 }

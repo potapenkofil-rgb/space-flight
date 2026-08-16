@@ -1,0 +1,102 @@
+/**
+ * The black box UI (PLAN.md §7 Agent F): bottom-docked timeline + telemetry
+ * charts. DESIGN.md §3: dock to an edge, never a floating window in flight;
+ * 1px Hairline frame, no rounded corners; every color is a token, never a
+ * hex literal.
+ */
+
+.replay-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: auto;
+  background: var(--color-panel);
+  border-top: var(--hairline-width) solid var(--color-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  z-index: 2;
+}
+
+.replay-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.replay-start-from-here {
+  font-family: var(--font-body);
+  font-size: var(--font-size-2);
+  background: var(--color-burn-soft);
+  color: var(--color-ink);
+  border: var(--hairline-width) solid var(--color-burn);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.replay-start-from-here:hover {
+  border-color: var(--color-burn);
+  filter: brightness(1.1);
+}
+
+.replay-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.replay-timeline-readout {
+  color: var(--color-ink);
+}
+
+.replay-timeline-track {
+  position: relative;
+  height: 22px;
+  background: var(--color-panel-alt);
+  border: var(--hairline-width) solid var(--color-hairline-soft);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.replay-timeline-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-orbit);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.replay-timeline-marker {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--marker-color, var(--color-muted));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.replay-charts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.replay-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.replay-chart canvas {
+  display: block;
+  width: 100%;
+  height: 56px;
+  background: var(--color-panel-alt);
+  border: var(--hairline-width) solid var(--color-hairline-soft);
+}

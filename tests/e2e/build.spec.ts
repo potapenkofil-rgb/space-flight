@@ -1,13 +1,13 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { gotoHangar, placePart } from './helpers';
 
 /**
  * Hangar acceptance scenario (PLAN.md §7, Agent C's zone / PLAN.md §8 step 2):
  * assemble a two-stage rocket by clicking, verify the ΔV readout, save,
  * reload the page, load — the blueprint comes back identical.
  *
- * Reached via the temporary `?scene=build` seam `main.ts` gained for this
- * (see the comment in `packages/app/src/main.ts` — the PLAN.md §7 stage-2
- * integrator is expected to replace it with the real menu → hangar route).
+ * Reached through the real menu → hangar route (`packages/app/src/main.ts`'s
+ * router) — the temporary `?scene=build` seam is gone.
  *
  * Numbers below mirror the real 25-part v1 roster in `data/parts/*` and the
  * real `computeMass`/`computeDeltaV` in `@karman/core` — this file used to
@@ -50,31 +50,14 @@ function parseFormattedNumber(text: string): number {
   return Number.parseFloat(cleaned);
 }
 
-async function gotoHangar(page: Page): Promise<void> {
-  await page.goto('/?scene=build');
-  await expect(page.getByTestId('build-overlay')).toBeVisible();
-}
-
-/** Clicks a catalog item, then clicks dead-centre of the workspace canvas — the hangar recentres its camera on the stack's newest open node after every commit (see `BuildScene.ts`'s `recenterCamera`), so centre is always the correct attach point when building straight up. */
-async function placeNext(page: Page, partId: string, category: string): Promise<void> {
-  await page.getByTestId(`build-catalog-tab-${category}`).click();
-  await page.getByTestId(`build-catalog-item-${partId}`).click();
-  const canvas = page.getByTestId('build-workspace-canvas');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('workspace canvas has no bounding box');
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  await page.mouse.move(cx, cy);
-  await page.mouse.click(cx, cy);
-}
 
 async function buildTwoStageRocket(page: Page): Promise<void> {
-  await placeNext(page, 'engine_launch', 'engines'); // root
-  await placeNext(page, 'tank_s1', 'tanks');
-  await placeNext(page, 'separator_stack', 'separators');
-  await placeNext(page, 'engine_vacuum', 'engines');
-  await placeNext(page, 'tank_m1', 'tanks');
-  await placeNext(page, 'pod_command', 'pod');
+  await placePart(page, 'engine_launch', 'engines'); // root
+  await placePart(page, 'tank_s1', 'tanks');
+  await placePart(page, 'separator_stack', 'separators');
+  await placePart(page, 'engine_vacuum', 'engines');
+  await placePart(page, 'tank_m1', 'tanks');
+  await placePart(page, 'pod_command', 'pod');
 }
 
 test('assemble a two-stage rocket by clicking, ΔV readout matches the rocket equation', async ({ page }) => {
@@ -136,7 +119,7 @@ test('save, reload the page, load — the blueprint is identical', async ({ page
 
 test('radial symmetry 4 places four sets of legs as one live group, visible in the readout part count', async ({ page }) => {
   await gotoHangar(page);
-  await placeNext(page, 'tank_m1', 'tanks'); // root, so its radial node lands exactly at the recentred origin
+  await placePart(page, 'tank_m1', 'tanks'); // root, so its radial node lands exactly at the recentred origin
   await page.getByTestId('build-symmetry-4').click();
 
   await page.getByTestId('build-catalog-tab-legs').click();

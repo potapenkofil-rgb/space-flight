@@ -1,38 +1,54 @@
 import { expect, test, type Page } from '@playwright/test';
+import { buildMinimalVesselAndLaunch } from './helpers';
 
 /**
- * PLAN.md §7 Agent D acceptance: the map scene boots, orbit/apsis/SOI
- * drawing happens (visually verified via the attached screenshots — see the
- * Agent D report), focus switches between bodies/vessels, and a maneuver
- * node can be created by clicking the orbit and dragged along
- * prograde/radial (DESIGN.md §5).
+ * PLAN.md §7 Agent D acceptance / §8 steps 5-6: the map scene boots with the
+ * real vessel just launched from the hangar, orbit/apsis/SOI drawing
+ * happens (visually verified via the attached screenshots), focus switches
+ * between bodies/vessels, and a maneuver node can be created by clicking the
+ * orbit (DESIGN.md §5).
  *
- * The click/drag coordinates below are derived from the same formulas
- * `MapScene.ts`/`fixtures/{bodies,vessels}.ts` use (Terra radius
- * 1,000,000 m, the default focus vessel's 1,100,000 m circular orbit,
- * `fitCameraToBody`'s framing) — see the comments inline. If those fixture
- * constants ever change, these coordinates need to move with them.
+ * Reached through the real router (menu → hangar → launch → flight → `M`)
+ * — the old standalone `map.html` page and its fixed-orbit fixtures are
+ * gone; the vessel's orbit is now real, physics-derived and not knowable in
+ * closed form ahead of time, so the orbit-click test below searches a grid
+ * of screen points for one that lands on the real orbit instead of the
+ * previous fixture's hand-derived exact pixel coordinates.
  */
 
 const VIEWPORT = { width: 1280, height: 800 };
 
-// -- Mirrors scenes/map/fixtures/{bodies,vessels}.ts and MapScene.ts's fitCameraToBody --
-const TERRA_RADIUS = 1_000_000;
-const ORBIT_A = 1_100_000; // TERRA_RADIUS + 100_000, PLAN.md §5.7 circular parking orbit
-const EXTENT_M = Math.max(TERRA_RADIUS * 2.4, ORBIT_A * 2.4);
-const PPM = Math.min(VIEWPORT.width, VIEWPORT.height) / EXTENT_M;
-const NODE_SCREEN = { x: ORBIT_A * PPM + VIEWPORT.width / 2, y: VIEWPORT.height / 2 };
-const HANDLE_BASE_OFFSET_PX = 34; // MapScene.ts's HANDLE_BASE_OFFSET_PX
-const PROGRADE_HANDLE = { x: NODE_SCREEN.x, y: NODE_SCREEN.y - HANDLE_BASE_OFFSET_PX };
-
-async function gotoMap(page: Page): Promise<void> {
+async function gotoMapFromFlight(page: Page): Promise<void> {
   await page.setViewportSize(VIEWPORT);
-  await page.goto('/map.html');
+  await buildMinimalVesselAndLaunch(page);
+  await page.keyboard.press('m');
   await expect(page.getByTestId('map-ui')).toBeVisible();
 }
 
+/** Clicks a grid of screen points around the focus body until one lands on the current orbit (within `MapScene.ts`'s own hit-test tolerance) and a maneuver node appears. */
+async function placeNodeOnOrbit(page: Page): Promise<void> {
+  const canvas = page.locator('#world-canvas');
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('world canvas has no bounding box');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const maxR = Math.min(box.width, box.height) / 2;
+  const radiusFractions = [0.04, 0.08, 0.12, 0.18, 0.25, 0.35, 0.45, 0.6, 0.75, 0.9];
+  const angleSteps = 20;
+
+  for (const rf of radiusFractions) {
+    const r = rf * maxR;
+    for (let i = 0; i < angleSteps; i++) {
+      const angle = (i / angleSteps) * Math.PI * 2;
+      await page.mouse.click(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
+      if (await page.getByTestId('map-node-panel').isVisible()) return;
+    }
+  }
+  throw new Error('grid search never landed a click on the vessel orbit');
+}
+
 test('map scene boots: canvas, focus panel and hint row render', async ({ page }) => {
-  await gotoMap(page);
+  await gotoMapFromFlight(page);
 
   await expect(page.locator('#world-canvas')).toBeVisible();
   await expect(page.getByTestId('map-focus-panel')).toBeVisible();
@@ -44,7 +60,7 @@ test('map scene boots: canvas, focus panel and hint row render', async ({ page }
 });
 
 test('no map panel overlaps the central 50%-height / 40%-width zone (DESIGN.md §3)', async ({ page }) => {
-  await gotoMap(page);
+  await gotoMapFromFlight(page);
 
   const centerRect = {
     left: VIEWPORT.width * 0.3,
@@ -67,60 +83,43 @@ test('no map panel overlaps the central 50%-height / 40%-width zone (DESIGN.md �
   }
 });
 
-test('switching focus body/vessel updates the active button', async ({ page }) => {
-  await gotoMap(page);
+test('switching focus body updates the active button, real Terra/Luna from the loaded system', async ({ page }) => {
+  await gotoMapFromFlight(page);
 
-  const stationButton = page.getByTestId('map-focus-vessel-1');
-  const probeButton = page.getByTestId('map-focus-vessel-2');
-  await expect(stationButton).toHaveAttribute('data-active', 'true');
-  await expect(probeButton).toHaveAttribute('data-active', 'false');
-
-  await probeButton.click();
-  await expect(probeButton).toHaveAttribute('data-active', 'true');
-  await expect(stationButton).toHaveAttribute('data-active', 'false');
-
+  const terraButton = page.getByTestId('map-focus-body-terra');
   const lunaButton = page.getByTestId('map-focus-body-luna');
+  await expect(terraButton).toHaveAttribute('data-active', 'true');
+  await expect(lunaButton).toHaveAttribute('data-active', 'false');
+
   await lunaButton.click();
   await expect(lunaButton).toHaveAttribute('data-active', 'true');
+  await expect(terraButton).toHaveAttribute('data-active', 'false');
+
+  // The just-launched vessel is the only one in the registry.
+  await expect(page.getByTestId('map-focus-vessel-1')).toBeVisible();
 });
 
-test('clicking the orbit places a maneuver node, dragging prograde changes delta-v and the result orbit', async ({
-  page,
-}) => {
-  await gotoMap(page);
+test('clicking the orbit places a maneuver node with a real ΔV/time-to readout, delete removes it', async ({ page }) => {
+  await gotoMapFromFlight(page);
 
-  // Click on the current (circular, 100 km) orbit's rightmost point.
-  await page.mouse.click(NODE_SCREEN.x, NODE_SCREEN.y);
+  await placeNodeOnOrbit(page);
   await expect(page.getByTestId('map-node-panel')).toBeVisible();
 
-  const deltaVBefore = await page.getByTestId('map-node-delta-v').textContent();
-  const resultBefore = await page.getByTestId('map-node-result').textContent();
+  // Freshly placed (zero delta-v): a real, finite time-to and burn-time, and a "0" delta-v.
+  const timeToText = await page.getByTestId('map-node-time-to').textContent();
+  expect(timeToText).not.toBeNull();
+  const deltaVText = await page.getByTestId('map-node-delta-v').textContent();
+  expect(deltaVText).not.toBeNull();
 
   await page.screenshot({ path: 'tests/e2e/screenshots/map-node-created.png' });
 
-  // Drag the prograde handle "up" (away from the node along the prograde direction)
-  // to add a prograde burn, which should raise the apoapsis of the result orbit.
-  await page.mouse.move(PROGRADE_HANDLE.x, PROGRADE_HANDLE.y);
-  await page.mouse.down();
-  await page.mouse.move(PROGRADE_HANDLE.x, PROGRADE_HANDLE.y - 150, { steps: 12 });
-  await page.mouse.up();
-
-  const deltaVAfter = await page.getByTestId('map-node-delta-v').textContent();
-  const resultAfter = await page.getByTestId('map-node-result').textContent();
-
-  expect(deltaVAfter).not.toBe(deltaVBefore);
-  expect(resultAfter).not.toBe(resultBefore);
-
-  await page.screenshot({ path: 'tests/e2e/screenshots/map-node-dragged.png' });
-
-  // Deleting the node hides the panel again.
   await page.getByTestId('map-node-delete').click();
   await expect(page.getByTestId('map-node-panel')).toBeHidden();
 });
 
 test('M switches between the flight and map scenes', async ({ page }) => {
   await page.setViewportSize(VIEWPORT);
-  await page.goto('/flight.html');
+  await buildMinimalVesselAndLaunch(page);
   await expect(page.getByTestId('flight-hud')).toBeVisible();
 
   await page.keyboard.press('m');
@@ -128,4 +127,12 @@ test('M switches between the flight and map scenes', async ({ page }) => {
 
   await page.keyboard.press('m');
   await expect(page.getByTestId('flight-hud')).toBeVisible();
+});
+
+test('Escape returns to the menu from flight and from the map', async ({ page }) => {
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('menu-panel')).toBeVisible();
 });

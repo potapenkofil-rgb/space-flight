@@ -4,13 +4,20 @@
  * overlay on top of the canvas world, per PLAN.md §1 ("the interface is HTML
  * over canvas"). Styling comes entirely from `ui/tokens.css` classes.
  *
- * Only the skeleton's own concerns live here: title, language/theme toggles,
- * and a stub "new flight" action. Agent C/D build the real hangar/flight
- * scenes this would eventually navigate to.
+ * Both "New Flight" and "Hangar" lead to the same place — the hangar is the
+ * only way to get a flyable vessel (PLAN.md §8: Menu → Hangar → Flight ⇄
+ * Map) — kept as two buttons because a returning player expects both labels,
+ * not because they navigate anywhere different yet; a `Continue`/load-world
+ * flow (PLAN.md §6.3) would be where they'd first diverge.
  */
 import './menu.css';
 import { getLocale, onLocaleChange, setLocale, t, type Locale } from '../../i18n';
 import { getInitialTheme, getTheme, setTheme, type ThemeName } from '../../ui/tokens';
+
+export interface MenuSceneOptions {
+  /** Navigates to the hangar (PLAN.md §8 step 2) — both "New Flight" and "Hangar" trigger this. */
+  readonly onEnterHangar: () => void;
+}
 
 function createButton(className: string, testId: string): HTMLButtonElement {
   const button = document.createElement('button');
@@ -25,7 +32,7 @@ function createButton(className: string, testId: string): HTMLButtonElement {
  * the initial theme (persisted choice, else dark per DESIGN.md §1 default) as
  * a side effect on first mount.
  */
-export function mountMenuScene(root: HTMLElement): () => void {
+export function mountMenuScene(root: HTMLElement, options: MenuSceneOptions): () => void {
   document.documentElement.dataset['theme'] = getInitialTheme();
 
   root.innerHTML = '';
@@ -47,10 +54,10 @@ export function mountMenuScene(root: HTMLElement): () => void {
 
   const newFlightButton = createButton('menu-button', 'menu-new-flight');
   newFlightButton.dataset['primary'] = 'true';
-  newFlightButton.disabled = true; // flight scene lands with Agent D; skeleton only proves the menu itself
+  newFlightButton.addEventListener('click', options.onEnterHangar);
 
   const hangarButton = createButton('menu-button', 'menu-hangar');
-  hangarButton.disabled = true; // hangar scene lands with Agent C
+  hangarButton.addEventListener('click', options.onEnterHangar);
 
   const settingsRow = document.createElement('div');
   settingsRow.className = 'menu-row';
@@ -98,6 +105,8 @@ export function mountMenuScene(root: HTMLElement): () => void {
   return () => {
     languageButton.removeEventListener('click', onLanguageClick);
     themeButton.removeEventListener('click', onThemeClick);
+    newFlightButton.removeEventListener('click', options.onEnterHangar);
+    hangarButton.removeEventListener('click', options.onEnterHangar);
     unsubscribeLocale();
     root.innerHTML = '';
   };

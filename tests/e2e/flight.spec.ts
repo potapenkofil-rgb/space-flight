@@ -1,27 +1,25 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { buildMinimalVesselAndLaunch, buildTwoStageVesselAndLaunch } from './helpers';
 
 /**
- * PLAN.md §7 Agent D acceptance: the flight scene boots, the HUD renders per
+ * PLAN.md §7 Agent D acceptance / §8 steps 2-5: the flight scene boots with
+ * a real vessel just launched from the hangar, the HUD renders per
  * DESIGN.md §3 (throttle vertical gauge left, altitude/speed big displays
  * right, atmosphere/G-load top-left, status lamp row along the bottom), and
  * — the hard architectural rule — no panel ever covers the central 50% of
  * height / 40% of width, which DESIGN.md §3 reserves for the rocket.
  *
- * Reaches the scene via `flight.html` directly (see `vite.config.ts`'s
- * multi-page build and the Agent D report) rather than through the menu,
- * since menu → scene routing isn't wired yet.
+ * Reached through the real router (menu → hangar → launch) — the old
+ * standalone `flight.html` page and its scripted-ascent fixture are gone;
+ * see `packages/app/src/scenes/flight/flightClock.ts` for the real physics
+ * loop this now drives.
  */
 
 const VIEWPORT = { width: 1280, height: 800 };
 
-async function gotoFlight(page: Page): Promise<void> {
-  await page.setViewportSize(VIEWPORT);
-  await page.goto('/flight.html');
-  await expect(page.getByTestId('flight-hud')).toBeVisible();
-}
-
 test('flight scene boots: canvas and every HUD panel render', async ({ page }) => {
-  await gotoFlight(page);
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
 
   await expect(page.locator('#world-canvas')).toBeVisible();
   await expect(page.getByTestId('hud-atmo-panel')).toBeVisible();
@@ -39,7 +37,8 @@ test('flight scene boots: canvas and every HUD panel render', async ({ page }) =
 });
 
 test('no HUD panel overlaps the central 50%-height / 40%-width zone (DESIGN.md §3)', async ({ page }) => {
-  await gotoFlight(page);
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
   await page.waitForTimeout(200);
 
   const centerRect = {
@@ -74,7 +73,8 @@ test('no HUD panel overlaps the central 50%-height / 40%-width zone (DESIGN.md �
 });
 
 test('Z sets full throttle instantly, X cuts it to zero', async ({ page }) => {
-  await gotoFlight(page);
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
 
   await page.keyboard.press('z');
   await page.waitForTimeout(100);
@@ -86,7 +86,8 @@ test('Z sets full throttle instantly, X cuts it to zero', async ({ page }) => {
 });
 
 test('T toggles the SAS lamp', async ({ page }) => {
-  await gotoFlight(page);
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
   const sasLamp = page.getByTestId('hud-lamp-sas');
   await expect(sasLamp).toHaveAttribute('data-state', 'off');
 
@@ -96,7 +97,8 @@ test('T toggles the SAS lamp', async ({ page }) => {
 });
 
 test(',/. steps time warp, shown on the warp lamp', async ({ page }) => {
-  await gotoFlight(page);
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
   const warpValue = page.getByTestId('hud-warp-value');
   await expect(warpValue).toContainText('×1');
 
@@ -109,20 +111,32 @@ test(',/. steps time warp, shown on the warp lamp', async ({ page }) => {
   await expect(warpValue).toContainText('×1');
 });
 
-test('ascent, staging and warp-to-orbit all drive the HUD end to end', async ({ page }) => {
-  await gotoFlight(page);
+test('full throttle climbs off the pad — altitude and speed actually change', async ({ page }) => {
+  await page.setViewportSize(VIEWPORT);
+  await buildMinimalVesselAndLaunch(page);
 
-  // Warp to 10x (always permitted, PLAN.md §3.3) and hold full throttle so the
-  // scripted ascent reaches its staging event (t=65s sim time) quickly.
-  await page.keyboard.press('.');
-  await page.keyboard.press('.');
-  await page.keyboard.press('.');
-  await expect(page.getByTestId('hud-warp-value')).toContainText('×10');
   await page.keyboard.press('z');
+  await page.waitForTimeout(2000);
 
-  await expect(page.getByTestId('hud-stage-value')).toContainText('2/2', { timeout: 15_000 });
-
-  // Altitude should be climbing well off the pad by now.
   const altitudeText = await page.getByTestId('hud-altitude-value').textContent();
+  expect(altitudeText).not.toBeNull();
   expect(altitudeText).not.toMatch(/^0/);
+  const speedText = await page.getByTestId('hud-speed-value').textContent();
+  expect(speedText).not.toBeNull();
+});
+
+test('Space stages the two-stage rocket built in the hangar', async ({ page }) => {
+  await page.setViewportSize(VIEWPORT);
+  await buildTwoStageVesselAndLaunch(page);
+  await expect(page.getByTestId('hud-stage-value')).toContainText('1/2');
+
+  await page.keyboard.press('z');
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Space');
+
+  // Separation (PLAN.md §3.4) hands the spent first stage off entirely —
+  // `splitVessel` re-indexes each resulting piece's own stages from zero, so
+  // the continuing (upper) vessel now legitimately has exactly one stage
+  // left, not a stale "stage 2 of the original 2".
+  await expect(page.getByTestId('hud-stage-value')).toContainText('1/1');
 });

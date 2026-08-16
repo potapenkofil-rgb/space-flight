@@ -8,6 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "pnpm --filter @karman/app run dev",
+    "preview": "pnpm --filter @karman/app run preview",
     "lint": "eslint . --max-warnings=0",
     "test": "pnpm -r --if-present run test",
     "build": "pnpm --filter @karman/core run build && pnpm --filter @karman/app run build",
@@ -24,6 +26,8 @@
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

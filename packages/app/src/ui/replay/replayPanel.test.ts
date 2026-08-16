@@ -139,6 +139,53 @@ describe('mountReplayPanel', () => {
     expect(startTime).toBeCloseTo(25, 6);
   });
 
+  it('starts collapsed by default — the charts/header are hidden, only the toggle row and a narrow timeline show', () => {
+    const root = document.createElement('div');
+    const panel = mountReplayPanel(root, {
+      session: fakeSession(),
+      vesselId: 1,
+      formatTime: (t) => `${t}`,
+      t: (key) => key,
+    });
+
+    expect(panel.isExpanded()).toBe(false);
+    const panelEl = root.querySelector('[data-testid="replay-panel"]') as HTMLElement;
+    expect(panelEl.dataset['expanded']).toBe('false');
+    // The collapsible body (header + charts) still exists in the DOM (so
+    // charts/markers keep rendering into it) but is CSS-hidden while collapsed.
+    expect(root.querySelector('.replay-collapsible')).not.toBeNull();
+  });
+
+  it('the toggle button expands and re-collapses the panel', () => {
+    const root = document.createElement('div');
+    const panel = mountReplayPanel(root, {
+      session: fakeSession(),
+      vesselId: 1,
+      formatTime: (t) => `${t}`,
+      t: (key) => key,
+    });
+
+    const toggle = root.querySelector('[data-testid="replay-toggle"]') as HTMLButtonElement;
+    toggle.click();
+    expect(panel.isExpanded()).toBe(true);
+    toggle.click();
+    expect(panel.isExpanded()).toBe(false);
+  });
+
+  it('setExpanded/startExpanded control state directly, for the caller to preserve it across a remount', () => {
+    const root = document.createElement('div');
+    const panel = mountReplayPanel(root, {
+      session: fakeSession(),
+      vesselId: 1,
+      formatTime: (t) => `${t}`,
+      t: (key) => key,
+      startExpanded: true,
+    });
+    expect(panel.isExpanded()).toBe(true);
+    panel.setExpanded(false);
+    expect(panel.isExpanded()).toBe(false);
+  });
+
   it('uses t() for every player-visible label', () => {
     const root = document.createElement('div');
     const seen: string[] = [];

@@ -173,12 +173,18 @@ export function mountFlightScene(canvas: HTMLCanvasElement, hudRoot: HTMLElement
   let timeSinceReplayRefresh = Number.POSITIVE_INFINITY;
 
   function refreshReplayPanel(): void {
+    // The periodic refresh unmounts and remounts a fresh panel (a new
+    // `ReplaySession` snapshot) — carry the player's expand/collapse choice
+    // across that, or toggling it open would silently re-collapse a few
+    // seconds later.
+    const wasExpanded = replayPanel?.isExpanded() ?? false;
     replayPanel?.unmount();
     replayPanel = mountReplayPanel(hudRoot, {
       session: recorder.openReplay(),
       vesselId: vessel.id,
       formatTime: formatFlightTime,
       t,
+      startExpanded: wasExpanded,
       onStartFromHere(atTime, vessels) {
         const restored = vessels.find((v) => v.id === vessel.id) ?? vessels[0];
         if (!restored) return;
@@ -193,6 +199,7 @@ export function mountFlightScene(canvas: HTMLCanvasElement, hudRoot: HTMLElement
   function onKeydown(evt: KeyboardEvent): void {
     if (evt.code === 'KeyM') navigate('map');
     else if (evt.code === 'Escape') navigate('menu');
+    else if (evt.code === 'KeyB') replayPanel?.setExpanded(!replayPanel.isExpanded());
   }
   window.addEventListener('keydown', onKeydown);
 
@@ -213,7 +220,12 @@ export function mountFlightScene(canvas: HTMLCanvasElement, hudRoot: HTMLElement
           latest.snapshot.vesselSpanMeters,
           Math.min(widthPx, heightPx)
         );
-        camera = followCamera(camera, latest.snapshot.position, targetPpm, dt);
+        // Velocity-led tracking (see `followCamera`'s doc): without this, a
+        // vessel launched at rest on Terra's own fast-rotating pad
+        // (~290 m/s equatorial speed) outruns the camera's exponential
+        // smoothing within about a second and drifts off-screen even with
+        // the engine off.
+        camera = followCamera(camera, latest.snapshot.position, targetPpm, dt, undefined, latest.snapshot.velocity);
 
         timeSinceReplayRefresh += dt;
         if (timeSinceReplayRefresh >= REPLAY_REFRESH_SECONDS) {

@@ -1,29 +1,68 @@
 /**
- * The black box UI (PLAN.md §7 Agent F): bottom-docked timeline + telemetry
- * charts. DESIGN.md §3: dock to an edge, never a floating window in flight;
- * 1px Hairline frame, no rounded corners; every color is a token, never a
- * hex literal.
+ * The black box UI (PLAN.md §7 Agent F): bottom-docked, collapsible timeline
+ * + telemetry charts. DESIGN.md §3: dock to an edge, never a floating
+ * window, and never cover another panel — inset horizontally to sit between
+ * the flight HUD's throttle gauge (left, 84px) and altitude/speed column
+ * (right, 240px — `ui/flight/hud.css`), and pinned just above its full-width
+ * lamp row (40px) rather than at the very bottom, so neither is ever
+ * covered in either collapsed or expanded state. 1px Hairline frame, no
+ * rounded corners, every color a token.
  */
 
 .replay-panel {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 92px;
+  right: 248px;
+  bottom: 40px;
   pointer-events: auto;
   background: var(--color-panel);
-  border-top: var(--hairline-width) solid var(--color-hairline);
+  border: var(--hairline-width) solid var(--color-hairline);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  z-index: 2;
+  max-height: 60vh;
+}
+
+/* -- Always-visible strip: label + expand/collapse toggle -- */
+.replay-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 12px;
+}
+
+.replay-toggle {
+  font-family: var(--font-data);
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: transparent;
+  color: var(--color-ink-muted);
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.replay-toggle:hover {
+  color: var(--color-ink);
+}
+
+/* -- Collapsible body: header + charts, hidden while collapsed -- */
+.replay-collapsible {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 16px 14px;
-  z-index: 2;
+  padding: 0 16px 10px;
+}
+.replay-panel[data-expanded='false'] .replay-collapsible {
+  display: none;
 }
 
 .replay-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -45,6 +84,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 4px 12px 8px;
 }
 
 .replay-timeline-readout {
@@ -58,6 +98,13 @@
   border: var(--hairline-width) solid var(--color-hairline-soft);
   cursor: pointer;
   touch-action: none;
+}
+/* Collapsed: a narrow strip — still scrubbable, just shorter. */
+.replay-panel[data-expanded='false'] .replay-timeline-track {
+  height: 8px;
+}
+.replay-panel[data-expanded='false'] .replay-timeline-readout {
+  display: none;
 }
 
 .replay-timeline-playhead {
@@ -79,6 +126,10 @@
   background: var(--marker-color, var(--color-muted));
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+.replay-panel[data-expanded='false'] .replay-timeline-marker {
+  width: 5px;
+  height: 5px;
 }
 
 .replay-charts {

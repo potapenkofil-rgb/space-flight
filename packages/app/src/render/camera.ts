@@ -97,6 +97,23 @@ export function screenToWorld(
  * snapping — exactly the "no jump" property `rebaseCamera` gets from staying
  * put between snaps, but here achieved by tracking continuously instead.
  *
+ * **Velocity leading.** A single-pole exponential tracker has an inherent
+ * steady-state lag behind a *constantly moving* target of
+ * `targetVelocity / smoothingPerSecond` — invisible for a slow-drifting
+ * target, but a real, game-breaking bug the moment the target moves fast
+ * relative to the zoom level: a vessel launched standing still on a
+ * fast-rotating body (Terra's own ~290 m/s equatorial pad speed, PLAN.md
+ * §5.7) produces tens of metres of lag, which — multiplied by a tight
+ * launch-pad zoom of tens of screen-px/m — is thousands of screen pixels,
+ * pushing the vessel off the visible viewport within a second even with the
+ * engine off (caught during integration: the flight scene rendered an empty
+ * screen with the vessel already off-camera). Passing `targetVelocity`
+ * "leads" the tracked point by exactly that lag (`target + v/k`), which
+ * cancels to zero steady-state error for any constant-velocity target — the
+ * anchor tracks a moving target with no lag at all, not just a stationary
+ * one. Defaults to zero (old behaviour, unaffected) for callers that don't
+ * have — or don't need — a velocity.
+ *
  * @param camera the current camera
  * @param targetAnchor world point (m) the camera should center on (usually the vessel's position)
  * @param targetPixelsPerMeter zoom level the camera should ease toward
@@ -104,19 +121,28 @@ export function screenToWorld(
  * @param smoothingPerSecond how much of the remaining distance to close per
  *   second, dimensionless (higher = snappier; PLAN.md doesn't pin an exact
  *   value, `6` reaches ~95% of the way there in half a second)
+ * @param targetVelocity `targetAnchor`'s own rate of change, m/s (world
+ *   frame) — see "Velocity leading" above. `{0,0}` reproduces the original,
+ *   lag-prone behaviour.
  */
 export function followCamera(
   camera: Camera,
   targetAnchor: Vec2,
   targetPixelsPerMeter: number,
   dt: number,
-  smoothingPerSecond = 6
+  smoothingPerSecond = 6,
+  targetVelocity: Vec2 = { x: 0, y: 0 }
 ): Camera {
   const t = 1 - Math.exp(-smoothingPerSecond * Math.max(0, dt));
+  const lead = smoothingPerSecond > 0 ? smoothingPerSecond : 1e-9;
+  const leadTarget = {
+    x: targetAnchor.x + targetVelocity.x / lead,
+    y: targetAnchor.y + targetVelocity.y / lead,
+  };
   return {
     anchor: {
-      x: camera.anchor.x + (targetAnchor.x - camera.anchor.x) * t,
-      y: camera.anchor.y + (targetAnchor.y - camera.anchor.y) * t,
+      x: camera.anchor.x + (leadTarget.x - camera.anchor.x) * t,
+      y: camera.anchor.y + (leadTarget.y - camera.anchor.y) * t,
     },
     pixelsPerMeter: camera.pixelsPerMeter + (targetPixelsPerMeter - camera.pixelsPerMeter) * t,
   };

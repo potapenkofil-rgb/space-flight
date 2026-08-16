@@ -2,16 +2,25 @@
  * Orbits, bodies and trajectory prediction. See PLAN.md §3.3 and §5.1 for the
  * physical model (patched conics, off-rails/on-rails), and §4 for the exact
  * contract these types must satisfy — six other agents import them verbatim.
+ *
+ * This file holds only the shapes from PLAN.md §4. Implementations live in
+ * `kepler.ts` (state <-> orbit, Kepler's equation, apoapsis/periapsis/period),
+ * `body.ts` (`createBody`, resolving `positionAt`/`velocityAt` through the
+ * parent chain) and `predictor.ts` (`createTrajectoryPredictor`) — see
+ * `orbits/index.ts` for the re-exports that keep this module's public surface
+ * identical to before the split.
  */
 import type { Vec2 } from '../math/vec2';
 
 /**
  * A Keplerian conic section around one `Body`. Valid for ellipses (`0 ≤ e < 1`),
  * parabolas (`e === 1`) and hyperbolas (`e > 1`); `a` is negative for hyperbolas
- * by convention (see PLAN.md §4).
+ * by convention (see PLAN.md §4). For a parabola, `a` instead holds the
+ * periapsis distance `q` (m) — see the "Convention for `Orbit.a`" note at the
+ * top of `kepler.ts`, since §4 reserves no separate field for it.
  */
 export interface Orbit {
-  /** Semi-major axis, m. Negative for a hyperbolic orbit. */
+  /** Semi-major axis, m. Negative for a hyperbolic orbit; periapsis distance `q`, m, for a parabola. */
   readonly a: number;
   /** Eccentricity, dimensionless. `0` = circle, `<1` = ellipse, `1` = parabola, `>1` = hyperbola. */
   readonly e: number;
@@ -25,90 +34,6 @@ export interface Orbit {
   readonly mu: number;
   /** Direction of travel: `1` = counter-clockwise (prograde), `-1` = clockwise (retrograde). */
   readonly dir: 1 | -1;
-}
-
-/**
- * Computes the osculating `Orbit` from a Cartesian state vector at time `t`.
- * Inverse of {@link stateFromOrbit}; the round trip must be accurate to a
- * relative error no worse than `1e-9` (PLAN.md §3.3).
- *
- * @param r position relative to the body's centre, m
- * @param v velocity relative to the body's centre, m/s
- * @param mu standard gravitational parameter of the body, m³/s²
- * @param t simulation time of this state, s
- */
-export function orbitFromState(r: Vec2, v: Vec2, mu: number, t: number): Orbit {
-  void r;
-  void v;
-  void mu;
-  void t;
-  throw new Error('not implemented: orbitFromState');
-}
-
-/**
- * Computes the Cartesian state vector of an `Orbit` at time `t`.
- * Inverse of {@link orbitFromState}.
- *
- * @param o the orbit
- * @param t simulation time to evaluate at, s
- * @returns position `r` (m) and velocity `v` (m/s) relative to the body's centre
- */
-export function stateFromOrbit(o: Orbit, t: number): { r: Vec2; v: Vec2 } {
-  void o;
-  void t;
-  throw new Error('not implemented: stateFromOrbit');
-}
-
-/**
- * Solves Kepler's equation `M = E − e·sin(E)` for the eccentric anomaly `E`.
- * Implementations must use a Newton solver with a bisection fallback: Newton
- * diverges as `e → 1` for some `M`, and the fallback prevents that from hanging
- * (PLAN.md, Agent A acceptance criteria: converges in < 20 iterations at `e = 0.999`).
- *
- * @param meanAnomaly mean anomaly `M`, rad
- * @param e eccentricity, dimensionless (`0 ≤ e`; behaviour for `e ≥ 1` is
- *   parabolic/hyperbolic anomaly and is defined by the implementation)
- * @returns eccentric anomaly `E`, rad (or the hyperbolic analogue for `e > 1`)
- */
-export function eccentricAnomaly(meanAnomaly: number, e: number): number {
-  void meanAnomaly;
-  void e;
-  throw new Error('not implemented: eccentricAnomaly');
-}
-
-/** Apoapsis distance from the body's centre, m. `+Infinity` for `e ≥ 1` (no apoapsis). */
-export function apoapsis(o: Orbit): number {
-  void o;
-  throw new Error('not implemented: apoapsis');
-}
-
-/** Periapsis distance from the body's centre, m. */
-export function periapsis(o: Orbit): number {
-  void o;
-  throw new Error('not implemented: periapsis');
-}
-
-/** Orbital period, s. `NaN` for parabolic/hyperbolic orbits (`e ≥ 1`), which never repeat. */
-export function period(o: Orbit): number {
-  void o;
-  throw new Error('not implemented: period');
-}
-
-/**
- * Time (absolute simulation time, s) at which the orbit reaches true anomaly `nu`,
- * searching forward from `from`. For elliptical orbits this is periodic; for
- * parabolic/hyperbolic orbits `nu` is only reached once (or never, outside the
- * asymptotic range) and the search does not wrap.
- *
- * @param o the orbit
- * @param nu target true anomaly, rad
- * @param from simulation time to search forward from, s
- */
-export function timeToTrueAnomaly(o: Orbit, nu: number, from: number): number {
-  void o;
-  void nu;
-  void from;
-  throw new Error('not implemented: timeToTrueAnomaly');
 }
 
 /** Atmospheric model of a `Body`, per PLAN.md §5.2: `ρ(h) = ρ₀·exp(−h/H)`, clamped to 0 above `top`. */

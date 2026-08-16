@@ -23,7 +23,7 @@ export interface ChecklistItem {
  */
 function checkCom(state: BuildState, parts: PartLibrary): LampStatus {
   if (state.parts.length === 0) return 'critical';
-  const vessel = toVessel(state, FIXTURE_TERRA);
+  const vessel = toVessel(state, parts, FIXTURE_TERRA);
   const mass = fakeComputeMass(vessel, parts);
   const xs = state.parts.map((p) => p.position.x);
   const minX = Math.min(...xs);

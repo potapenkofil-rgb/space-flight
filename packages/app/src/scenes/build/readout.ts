@@ -36,7 +36,7 @@ export function computeReadout(
   body: Body,
   ambientPressure = 1
 ): Readout {
-  const vessel = toVessel(state, body);
+  const vessel = toVessel(state, parts, body);
   vessel.mass = fakeComputeMass(vessel, parts);
   const stages = fakeComputeDeltaV(vessel, parts, ambientPressure);
 

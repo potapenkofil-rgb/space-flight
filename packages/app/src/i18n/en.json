@@ -111,5 +111,19 @@
   "BUILD_SAVE": "Save",
   "BUILD_LOAD": "Load",
   "BUILD_BLUEPRINT_NAME_PLACEHOLDER": "Blueprint name…",
-  "BUILD_NO_BLUEPRINTS": "No saved blueprints"
+  "BUILD_NO_BLUEPRINTS": "No saved blueprints",
+  "REPLAY_TIMELINE": "Flight recorder",
+  "REPLAY_START_FROM_HERE": "Start from here",
+  "REPLAY_CHART_ALTITUDE": "Altitude",
+  "REPLAY_CHART_SPEED": "Speed",
+  "REPLAY_CHART_G_FORCE": "G-force",
+  "REPLAY_CHART_FUEL": "Fuel",
+  "REPLAY_MARKER_LAUNCH": "Launch",
+  "REPLAY_MARKER_STAGE_SEPARATION": "Stage separation",
+  "REPLAY_MARKER_PART_LOSS": "Part lost",
+  "REPLAY_MARKER_ATMOSPHERE_ENTRY": "Atmosphere entry",
+  "REPLAY_MARKER_APOAPSIS": "Apoapsis",
+  "REPLAY_MARKER_PERIAPSIS": "Periapsis",
+  "REPLAY_MARKER_LANDING": "Landing",
+  "REPLAY_MARKER_IMPACT": "Impact"
 }

@@ -183,7 +183,7 @@ describe('toVessel', () => {
   it('produces a Vessel-shaped object matching PLAN.md §4', () => {
     let state = placeRoot(createEmptyState(), FIXTURE_PARTS, 'engine_start');
     state = place(state, 'tank_s1');
-    const vessel = toVessel(state, FIXTURE_TERRA, 7);
+    const vessel = toVessel(state, FIXTURE_PARTS, FIXTURE_TERRA, 7);
     expect(vessel.id).toBe(7);
     expect(vessel.parts).toHaveLength(2);
     expect(vessel.joints).toHaveLength(1);

@@ -492,10 +492,13 @@ export function rebuildSymmetryGroup(
 }
 
 /** Converts the hangar's working state into a real `Vessel` (PLAN.md §4) — what `computeMass`/`computeDeltaV`/checklists/flight-plan math actually consume. */
-export function toVessel(state: BuildState, soi: Body, id = 1): Vessel {
+export function toVessel(state: BuildState, library: PartLibrary, soi: Body, id = 1): Vessel {
   const parts = state.parts.map((p) => ({
     id: p.instanceId,
     partId: p.partId,
+    // `PartInstance` carries its own definition (PLAN.md §4, added by Agent B):
+    // mass, fuel and joint strength are read straight off the instance.
+    def: library.get(p.partId),
     position: p.position,
     rotation: p.rotation,
     resources: p.resources,

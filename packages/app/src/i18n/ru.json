@@ -111,5 +111,19 @@
   "BUILD_SAVE": "Сохранить",
   "BUILD_LOAD": "Загрузить",
   "BUILD_BLUEPRINT_NAME_PLACEHOLDER": "Имя чертежа…",
-  "BUILD_NO_BLUEPRINTS": "Нет сохранённых чертежей"
+  "BUILD_NO_BLUEPRINTS": "Нет сохранённых чертежей",
+  "REPLAY_TIMELINE": "Чёрный ящик",
+  "REPLAY_START_FROM_HERE": "Старт с отметки",
+  "REPLAY_CHART_ALTITUDE": "Высота",
+  "REPLAY_CHART_SPEED": "Скорость",
+  "REPLAY_CHART_G_FORCE": "Перегрузка",
+  "REPLAY_CHART_FUEL": "Топливо",
+  "REPLAY_MARKER_LAUNCH": "Старт",
+  "REPLAY_MARKER_STAGE_SEPARATION": "Отделение ступени",
+  "REPLAY_MARKER_PART_LOSS": "Потеря детали",
+  "REPLAY_MARKER_ATMOSPHERE_ENTRY": "Вход в атмосферу",
+  "REPLAY_MARKER_APOAPSIS": "Апоцентр",
+  "REPLAY_MARKER_PERIAPSIS": "Перицентр",
+  "REPLAY_MARKER_LANDING": "Посадка",
+  "REPLAY_MARKER_IMPACT": "Удар"
 }

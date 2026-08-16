@@ -179,13 +179,18 @@ test('contact sheet — all 25 parts render through Path2D (DESIGN.md §4)', asy
       }
       const pixelsPerMeter = drawW / part.boundsW;
 
+      // Anchored at `vbH` (the viewBox's *bottom* edge), not `0`: every real
+      // `data/parts/**/part.svg` is authored the ordinary way (nose near
+      // `y = 0`, base near `y = vbH` — see `render/part-renderer.ts`'s
+      // `drawPart` doc for the concrete example and why an anchor at `0`
+      // silently draws every part upside down).
       const scaleX = (part.boundsW / vbW) * pixelsPerMeter;
-      const scaleY = -(part.boundsH / vbH) * pixelsPerMeter;
+      const scaleY = (part.boundsH / vbH) * pixelsPerMeter;
 
       ctx.save();
       ctx.translate(CELL_PX / 2, CELL_PX / 2 + drawH / 2);
       ctx.scale(scaleX, scaleY);
-      ctx.translate(-vbW / 2, 0);
+      ctx.translate(-vbW / 2, -vbH);
       for (const child of Array.from(svgEl.children)) drawShape(ctx, child, scaleX);
       ctx.restore();
 

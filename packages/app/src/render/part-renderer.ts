@@ -65,6 +65,17 @@ export interface ParsedShape {
 
 export interface ParsedPartArt {
   readonly viewBox: { readonly w: number; readonly h: number };
+  /**
+   * Vertical extent actually covered by ink, in viewBox units, outer edge of
+   * the stroke included. This — not `viewBox` — is what maps onto the part's
+   * `bounds.h`, because an artist frames a drawing inside the canvas with
+   * whatever margin looks right in an editor, while `bounds.h` is the
+   * physical distance between the part's two stack nodes. Mapping the raw
+   * viewBox instead turns every margin into a visible gap in an assembled
+   * rocket: `pod_command`'s ink covers 53% of its canvas, so nearly half its
+   * height rendered as empty space between it and the tank below.
+   */
+  readonly contentY: { readonly min: number; readonly max: number };
   readonly shapes: readonly ParsedShape[];
   /** One entry per unsupported element/attribute encountered, for the "mods with errors" log (PLAN.md §6.2). */
   readonly warnings: readonly string[];
@@ -172,7 +183,12 @@ export function parsePartArt(svgSource: string): ParsedPartArt {
   const root = doc.documentElement;
 
   if (root === null || root.tagName.toLowerCase() !== 'svg' || doc.querySelector('parsererror') !== null) {
-    return { viewBox: { w: 64, h: 64 }, shapes: [], warnings: ['part.svg failed to parse as XML'] };
+    return {
+      viewBox: { w: 64, h: 64 },
+      contentY: { min: 0, max: 64 },
+      shapes: [],
+      warnings: ['part.svg failed to parse as XML'],
+    };
   }
 
   const viewBoxAttr = root.getAttribute('viewBox');
@@ -187,7 +203,59 @@ export function parsePartArt(svgSource: string): ParsedPartArt {
     if (shape) shapes.push(shape);
   }
 
-  return { viewBox, shapes, warnings };
+  return { viewBox, contentY: contentYExtent(shapes, viewBox.h), shapes, warnings };
+}
+
+/**
+ * Vertical extent of a shape's own geometry, before stroke. Path extents are
+ * taken from every coordinate pair in the `d` string: the art subset is
+ * `M`/`L`/`Q`/`Z` only (see this module's header), and a quadratic curve
+ * never leaves the hull of its control points, so the pairs bound the curve.
+ */
+function shapeYExtent(g: ShapeGeometry): { min: number; max: number } | null {
+  switch (g.kind) {
+    case 'rect':
+      return { min: g.y, max: g.y + g.h };
+    case 'circle':
+      return { min: g.cy - g.r, max: g.cy + g.r };
+    case 'line':
+      return { min: Math.min(g.y1, g.y2), max: Math.max(g.y1, g.y2) };
+    case 'polygon': {
+      if (g.points.length === 0) return null;
+      const ys = g.points.map((p) => p.y);
+      return { min: Math.min(...ys), max: Math.max(...ys) };
+    }
+    case 'path': {
+      const numbers = g.d.match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi)?.map(Number.parseFloat) ?? [];
+      const ys: number[] = [];
+      for (let i = 1; i < numbers.length; i += 2) {
+        const y = numbers[i];
+        if (y !== undefined && Number.isFinite(y)) ys.push(y);
+      }
+      if (ys.length === 0) return null;
+      return { min: Math.min(...ys), max: Math.max(...ys) };
+    }
+  }
+}
+
+function contentYExtent(shapes: readonly ParsedShape[], viewBoxHeight: number): { min: number; max: number } {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (const shape of shapes) {
+    const extent = shapeYExtent(shape.geometry);
+    if (extent === null) continue;
+    // Half the stroke sits outside the geometry on each side; that ink is
+    // part of what the eye reads as the part's edge, so it counts.
+    const overhang = shape.strokeRole !== null ? shape.strokeWidth / 2 : 0;
+    min = Math.min(min, extent.min - overhang);
+    max = Math.max(max, extent.max + overhang);
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max - min <= 0) {
+    return { min: 0, max: viewBoxHeight };
+  }
+  return { min, max };
 }
 
 const parseCache = new WeakMap<object, ParsedPartArt>();
@@ -258,9 +326,19 @@ export interface PartDrawTransform {
 }
 
 /**
- * Draws one part instance. The part's SVG is authored Y-up with the origin
- * at the bottom node and `x ∈ [0, viewBox.w]` centered on the part's own
- * centerline (DESIGN.md §4) — this maps that local frame onto
+ * Draws one part instance. `PartDrawTransform.originPx` is the screen
+ * position of the part's *local* origin — its bottom stack node (DESIGN.md
+ * §4) — but every actual `part.svg` in `data/parts/**` is authored the
+ * ordinary way an SVG editor encourages: nose near `viewBox`'s `y = 0` (the
+ * top of the drawing, e.g. `pod_command`'s nose arc pokes to `y ≈ -4`) and
+ * base near `y = viewBox.h` (the bottom of the drawing, e.g. `engine_launch`'s
+ * nozzle exit sits at `y = 62` of 64). So the origin has to anchor to
+ * `viewBox.h`, not `0` — anchoring at `0` (as an earlier version of this
+ * function did, with no offsetting Y-translate) plants whatever the artist
+ * drew *at the top of the image* — the nose — exactly at the bottom
+ * attach-node position instead, silently rendering every part upside down
+ * (nose at the join, base floating above it). `x ∈ [0, viewBox.w]` is
+ * centered on the part's own centerline. This maps that local frame onto
  * `part.bounds` (metres) and then onto `transform` (screen px), so a 64×64
  * viewBox always fills exactly `bounds.w × bounds.h` metres regardless of
  * how the art was drawn.
@@ -274,15 +352,18 @@ export interface PartDrawTransform {
  */
 export function drawPart(ctx: CanvasRenderingContext2D, part: PartDef, transform: PartDrawTransform): void {
   const art = getParsedArt(part);
+  const contentHeight = art.contentY.max - art.contentY.min;
   const scaleX = (part.bounds.w / art.viewBox.w) * transform.pixelsPerMeter;
-  const scaleY = -(part.bounds.h / art.viewBox.h) * transform.pixelsPerMeter;
+  // Y maps the inked extent — not the whole canvas — onto `bounds.h`, so
+  // stacked parts meet flush however the artist framed the drawing.
+  const scaleY = (part.bounds.h / contentHeight) * transform.pixelsPerMeter;
   const deviceScale = Math.abs(scaleX);
 
   ctx.save();
   ctx.translate(transform.originPx.x, transform.originPx.y);
   ctx.rotate(transform.rotation);
   ctx.scale(scaleX, scaleY);
-  ctx.translate(-art.viewBox.w / 2, 0);
+  ctx.translate(-art.viewBox.w / 2, -art.contentY.max);
 
   for (const shape of art.shapes) {
     const path = getPath2D(shape);

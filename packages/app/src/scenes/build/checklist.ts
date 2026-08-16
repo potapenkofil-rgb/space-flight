@@ -4,10 +4,8 @@
  * function of the assembly; `BuildScene.ts` maps `LampStatus` to
  * `Nominal`/`Warning`/`Critical` tokens (DESIGN.md §1).
  */
-import type { PartLibrary } from '@karman/core';
+import { computeMass, type Body, type PartLibrary } from '@karman/core';
 import { toVessel, type BuildState } from './state';
-import { fakeComputeMass } from './__fixtures__/coreFakes';
-import { FIXTURE_TERRA } from './__fixtures__/system';
 
 export type LampStatus = 'nominal' | 'warning' | 'critical';
 
@@ -17,14 +15,34 @@ export interface ChecklistItem {
 }
 
 /**
+ * `toVessel` requires a `Body` for `Vessel.soi`, but the centre-of-mass check
+ * below only reads `computeMass`'s output, which never consults `soi` — an
+ * inert placeholder (not a physics fixture: no field of it feeds any
+ * computation here) avoids pulling the real `SystemLibrary` into a check that
+ * doesn't need one.
+ */
+const INERT_BODY: Body = {
+  id: 'checklist-inert',
+  mu: 1,
+  radius: 1,
+  soiRadius: Number.POSITIVE_INFINITY,
+  rotationPeriod: 1,
+  atmosphere: null,
+  parent: null,
+  orbit: null,
+  positionAt: () => ({ x: 0, y: 0 }),
+  velocityAt: () => ({ x: 0, y: 0 }),
+};
+
+/**
  * Centre-of-mass check: flags a COM sitting outside the assembly's own
  * horizontal footprint as `critical` (the rocket will tip on the pad), and one
  * off-centre by more than 15% of the footprint width as a `warning`.
  */
 function checkCom(state: BuildState, parts: PartLibrary): LampStatus {
   if (state.parts.length === 0) return 'critical';
-  const vessel = toVessel(state, parts, FIXTURE_TERRA);
-  const mass = fakeComputeMass(vessel, parts);
+  const vessel = toVessel(state, parts, INERT_BODY);
+  const mass = computeMass(vessel);
   const xs = state.parts.map((p) => p.position.x);
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);

@@ -110,6 +110,7 @@
   "BUILD_FLIGHTPLAN_INSUFFICIENT": "Не хватает",
   "BUILD_SAVE": "Сохранить",
   "BUILD_LOAD": "Загрузить",
+  "BUILD_LAUNCH": "Пуск",
   "BUILD_BLUEPRINT_NAME_PLACEHOLDER": "Имя чертежа…",
   "BUILD_NO_BLUEPRINTS": "Нет сохранённых чертежей",
   "REPLAY_TIMELINE": "Чёрный ящик",

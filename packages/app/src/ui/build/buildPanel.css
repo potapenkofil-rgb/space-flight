@@ -110,6 +110,12 @@
   border-color: var(--color-burn);
   color: var(--color-burn);
 }
+/* The launch button — DESIGN.md §1: Burn is reserved for energy/irreversibility, launching the vessel qualifies. */
+.build-button[data-primary='true']:not(:disabled) {
+  border-color: var(--color-burn);
+  color: var(--color-burn);
+  background: var(--color-burn-soft);
+}
 .build-button[data-active='true'] {
   border-color: var(--color-orbit);
   color: var(--color-orbit);

@@ -110,6 +110,7 @@
   "BUILD_FLIGHTPLAN_INSUFFICIENT": "Insufficient",
   "BUILD_SAVE": "Save",
   "BUILD_LOAD": "Load",
+  "BUILD_LAUNCH": "Launch",
   "BUILD_BLUEPRINT_NAME_PLACEHOLDER": "Blueprint name…",
   "BUILD_NO_BLUEPRINTS": "No saved blueprints",
   "REPLAY_TIMELINE": "Flight recorder",

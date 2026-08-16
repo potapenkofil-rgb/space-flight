@@ -5,10 +5,9 @@
  * interface is HTML over canvas") — styling from `ui/build/buildPanel.css`
  * classes, colors/fonts only from `ui/tokens.css` tokens (DESIGN.md §1/§2).
  *
- * `library`/`system` default to the local fixtures (`__fixtures__/`) so this
- * scene runs standalone today; pass the real `PartLibrary`/`SystemLibrary`
- * once Agent E's data loader lands (see `__fixtures__/parts.ts`/`system.ts`
- * for the exact swap points).
+ * `library`/`system` default to the real content loaded by
+ * `data/content.ts` (the full 25-part v1 roster and `data/systems/karman.json`)
+ * — pass a different `PartLibrary`/`SystemLibrary` only for tests.
  */
 import {
   formatDeltaV,
@@ -21,8 +20,10 @@ import {
   type PartLibrary,
   type SystemLibrary,
 } from '@karman/core';
+import { loadContent } from '../../data/content';
 import { getLocale, onLocaleChange, t } from '../../i18n';
 import { createCamera, screenToWorld, worldToScreen, zoomCamera, type Camera } from '../../render/camera';
+import { drawPart } from '../../render/part-renderer';
 import { createLamp, createPanel, createPanelBody, createReadoutRow, type LampElements } from '../../ui/build/widgets';
 import '../../ui/build/buildPanel.css';
 import { listBlueprints, loadBlueprint, saveBlueprint } from './blueprint';
@@ -39,7 +40,6 @@ import {
   type FlightStepDef,
   type FlightStepKind,
 } from './flightPlan';
-import { drawParsedArt, parsePartArt } from './partArt';
 import { computeReadout } from './readout';
 import {
   attachPart,
@@ -56,7 +56,6 @@ import {
   type SymmetryCount,
 } from './state';
 import { drawAssembly, drawGhostPart, drawGrid, drawOpenNodeMarkers } from './workspaceRenderer';
-import { FIXTURE_PARTS, FIXTURE_SYSTEM } from './__fixtures__';
 
 const MIN_PPM = 4;
 const MAX_PPM = 120;
@@ -89,11 +88,14 @@ const FLIGHTPLAN_STEP_KEY: Record<FlightStepKind, string> = {
 export interface BuildSceneOptions {
   readonly library?: PartLibrary;
   readonly system?: SystemLibrary;
+  /** Called when the player launches the assembled vessel (PLAN.md §8 step 4) — the orchestrator's router wires this to the flight scene. */
+  readonly onLaunch?: (state: BuildState, library: PartLibrary, system: SystemLibrary) => void;
 }
 
 export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = {}): () => void {
-  const library: PartLibrary = options.library ?? FIXTURE_PARTS;
-  const system: SystemLibrary = options.system ?? FIXTURE_SYSTEM;
+  const content = options.library && options.system ? null : loadContent();
+  const library: PartLibrary = options.library ?? content!.library;
+  const system: SystemLibrary = options.system ?? content!.system;
   const homeBody: Body = system.root;
 
   setUnitsLocale(getLocale());
@@ -168,7 +170,14 @@ export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = 
   loadButton.type = 'button';
   loadButton.dataset['testid'] = 'build-load';
 
-  topbarActions.append(deleteButton, flightPlanToggle, blueprintNameInput, saveButton, loadSelect, loadButton);
+  const launchButton = document.createElement('button');
+  launchButton.className = 'build-button';
+  launchButton.type = 'button';
+  launchButton.dataset['testid'] = 'build-launch';
+  launchButton.dataset['primary'] = 'true';
+  launchButton.disabled = true; // enabled once a launch-worthy vessel exists — see onStateChanged
+
+  topbarActions.append(deleteButton, flightPlanToggle, blueprintNameInput, saveButton, loadSelect, loadButton, launchButton);
   topbar.append(title, topbarActions);
 
   // Catalog column
@@ -293,6 +302,7 @@ export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = 
     blueprintNameInput.placeholder = t('BUILD_BLUEPRINT_NAME_PLACEHOLDER');
     saveButton.textContent = t('BUILD_SAVE');
     loadButton.textContent = t('BUILD_LOAD');
+    launchButton.textContent = t('BUILD_LAUNCH');
     searchInput.placeholder = t('BUILD_SEARCH_PLACEHOLDER');
     symmetryLabel.textContent = t('BUILD_SYMMETRY_LABEL');
     rowMass.label.textContent = t('BUILD_READOUT_MASS');
@@ -318,17 +328,25 @@ export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = 
   }
 
   // ---- catalog --------------------------------------------------------------
+  const CATALOG_PREVIEW_SIZE_PX = 48;
+  const CATALOG_PREVIEW_PADDING_PX = 6;
+
+  /** Draws one part's icon fit into a `CATALOG_PREVIEW_SIZE_PX` square, preserving its real `bounds` aspect ratio (same `Path2D` vector as the workspace, DESIGN.md §4). */
   function renderCatalogPreview(canvasEl: HTMLCanvasElement, def: PartDef): void {
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const size = 48;
+    const size = CATALOG_PREVIEW_SIZE_PX;
     canvasEl.width = size * dpr;
     canvasEl.height = size * dpr;
     const ctx = canvasEl.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    const parsed = parsePartArt(def.art);
-    drawParsedArt(ctx, parsed, 2, 2, size - 4, 2);
+
+    const available = size - CATALOG_PREVIEW_PADDING_PX * 2;
+    const pixelsPerMeter = available / Math.max(def.bounds.w, def.bounds.h);
+    const drawHeightPx = def.bounds.h * pixelsPerMeter;
+    const originPx = { x: size / 2, y: size / 2 + drawHeightPx / 2 };
+    drawPart(ctx, def, { originPx, rotation: 0, pixelsPerMeter });
   }
 
   function renderCatalogTabs(): void {
@@ -404,7 +422,11 @@ export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = 
     for (const item of items) {
       lamps[item.id].setStatus(item.status);
     }
-    checklistBar.dataset['overall'] = overallStatus(items);
+    const overall = overallStatus(items);
+    checklistBar.dataset['overall'] = overall;
+    // A critical lamp (no engine, absent/way-off COM) blocks launch outright;
+    // a warning (e.g. no legs, low power) is the player's call to make.
+    launchButton.disabled = overall === 'critical';
   }
 
   // ---- stages -------------------------------------------------------------
@@ -761,6 +783,11 @@ export function mountBuildScene(root: HTMLElement, options: BuildSceneOptions = 
     heldPartId = null;
     pendingCandidate = null;
     onStateChanged();
+  });
+
+  launchButton.addEventListener('click', () => {
+    if (state.parts.length === 0) return;
+    options.onLaunch?.(state, library, system);
   });
 
   searchInput.addEventListener('input', () => {

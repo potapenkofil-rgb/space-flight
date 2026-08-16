@@ -6,10 +6,13 @@
  * satisfying "updates live while the part is still hanging on the cursor" without this
  * module knowing anything about pointers or the DOM.
  */
-import type { Body, PartLibrary, StageDeltaV } from '@karman/core';
-import { fakeComputeDeltaV, fakeComputeMass } from './__fixtures__/coreFakes';
-import { surfaceGravity } from './__fixtures__/system';
+import { computeDeltaV, computeMass, type Body, type PartLibrary, type StageDeltaV } from '@karman/core';
 import { toVessel, type BuildState } from './state';
+
+/** Local surface gravity `g = μ/r²`, m/s² (PLAN.md §5.1). */
+function surfaceGravity(body: Body): number {
+  return body.mu / (body.radius * body.radius);
+}
 
 export interface Readout {
   readonly massKg: number;
@@ -37,8 +40,8 @@ export function computeReadout(
   ambientPressure = 1
 ): Readout {
   const vessel = toVessel(state, parts, body);
-  vessel.mass = fakeComputeMass(vessel, parts);
-  const stages = fakeComputeDeltaV(vessel, parts, ambientPressure);
+  vessel.mass = computeMass(vessel);
+  const stages = computeDeltaV(vessel, ambientPressure);
 
   const g = surfaceGravity(body);
   let thrustVacN = 0;

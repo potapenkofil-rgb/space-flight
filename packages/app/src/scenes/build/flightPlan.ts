@@ -15,7 +15,11 @@
  * whole point of the exercise.
  */
 import type { Body } from '@karman/core';
-import { surfaceGravity } from './__fixtures__/system';
+
+/** Local surface gravity `g = μ/r²`, m/s² (PLAN.md §5.1). */
+function surfaceGravity(body: Body): number {
+  return body.mu / (body.radius * body.radius);
+}
 
 /** Circular-orbit speed at radius `r` (m, from the body's centre) around a body of parameter `mu`. */
 export function circularOrbitSpeed(mu: number, r: number): number {

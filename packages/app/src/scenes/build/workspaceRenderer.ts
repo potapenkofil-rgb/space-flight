@@ -2,17 +2,17 @@
  * Canvas drawing for the hangar's centre workspace: the DESIGN.md §3 grid
  * ("26 px at base zoom, `HairlineSoft` lines, every fifth line `Hairline`"),
  * the assembled rocket (same `Path2D` vector as the catalog preview — DESIGN.md
- * §4), the held "ghost" part following the cursor, and its symmetry preview.
- * Pure rendering — reads a `BuildState` snapshot, writes only to `ctx`.
+ * §4, via `render/part-renderer.ts`), the held "ghost" part following the
+ * cursor, and its symmetry preview. Pure rendering — reads a `BuildState`
+ * snapshot, writes only to `ctx`.
  */
 import type { PartLibrary } from '@karman/core';
 import { getColor } from '../../ui/tokens';
 import { type Camera, worldToScreen } from '../../render/camera';
-import { drawParsedArt, parsePartArt } from './partArt';
+import { drawPart } from '../../render/part-renderer';
 import { nodeWorldPos, type BuildState, type PlacedPart } from './state';
 import { GRID_STEP_M } from './grid';
 
-const STROKE_WIDTH_UNITS = 2; // DESIGN.md §4: 2 units in the 64x64 viewBox coordinate space
 const NODE_MARKER_RADIUS_PX = 3;
 
 /** Draws the DESIGN.md §3 hangar grid, filling the whole canvas. */
@@ -54,7 +54,13 @@ export function drawGrid(
   }
 }
 
-/** Draws one placed part at its world position, using the same vector as the catalog preview. */
+/**
+ * Draws one placed part at its world position, using the same `Path2D`
+ * renderer as the catalog preview (`render/part-renderer.ts`, PLAN.md §3.7).
+ * The part's own local origin is its bottom stack node (DESIGN.md §4), which
+ * is exactly `PlacedPart.position` (see `state.ts`'s `toVessel` doc) — so it
+ * maps straight onto `drawPart`'s `originPx` with no extra offset.
+ */
 export function drawPlacedPart(
   ctx: CanvasRenderingContext2D,
   camera: Camera,
@@ -65,21 +71,15 @@ export function drawPlacedPart(
   opacity = 1
 ): void {
   const def = library.get(part.partId);
-  const parsed = parsePartArt(def.art);
-  const sizePx = Math.max(def.bounds.w, def.bounds.h) * camera.pixelsPerMeter;
-  const strokeWidthPx = (STROKE_WIDTH_UNITS / Math.max(parsed.viewBox.w, parsed.viewBox.h)) * sizePx;
-
-  const center = worldToScreen(camera, part.position, viewportWidthPx, viewportHeightPx);
+  const originPx = worldToScreen(camera, part.position, viewportWidthPx, viewportHeightPx);
 
   ctx.save();
   ctx.globalAlpha = opacity;
-  ctx.translate(center.x, center.y);
-  ctx.rotate(-part.rotation); // screen Y is flipped vs. world Y (PLAN.md §3.1), so world CCW rotation reads as screen CW
-  // `drawParsedArt` draws with the viewBox's top-left at its given origin; the
-  // part's own local origin is its bottom stack node (DESIGN.md §4), which in
-  // our viewBox convention is the bottom-centre of the box (`partArt.ts`/the
-  // fixture's own inverse transform), so offset by half width, full height.
-  drawParsedArt(ctx, parsed, -sizePx / 2, -sizePx, sizePx, strokeWidthPx);
+  drawPart(ctx, def, {
+    originPx,
+    rotation: -part.rotation, // screen Y is flipped vs. world Y (PLAN.md §3.1), so world CCW rotation reads as screen CW
+    pixelsPerMeter: camera.pixelsPerMeter,
+  });
   ctx.restore();
 }
 

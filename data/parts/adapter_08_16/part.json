@@ -1,0 +1,49 @@
+{
+  "id": "adapter_08_16",
+  "name": {
+    "en": "Size Adapter 0.8→1.6",
+    "ru": "Переходник 0,8→1,6"
+  },
+  "description": {
+    "en": "Tapers a 0.8 m stack up to the standard 1.6 m size.",
+    "ru": "Переходит с диаметра 0,8 м на стандартный 1,6 м."
+  },
+  "category": "adapters",
+  "dryMass": 60,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.4,
+  "nodeStrength": 400000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 1.6,
+    "h": 0.6
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 0.5,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        0.6
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

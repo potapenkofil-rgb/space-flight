@@ -1,0 +1,42 @@
+{
+  "id": "power_solar",
+  "name": {
+    "en": "Solar Panel",
+    "ru": "Солнечная панель"
+  },
+  "description": {
+    "en": "Deployable photovoltaic panel with a small storage buffer.",
+    "ru": "Раскладная солнечная панель с небольшим буфером хранения."
+  },
+  "category": "power",
+  "dryMass": 20,
+  "resources": [
+    {
+      "id": "electricity",
+      "capacity": 20
+    }
+  ],
+  "engine": null,
+  "dragArea": 0.5,
+  "nodeStrength": 150000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1,
+    "h": 0.2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.5,
+        0.1
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 0.5,
+      "kind": "radial"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "id": "fins_control",
+  "name": {
+    "en": "Aero Fin",
+    "ru": "Аэродинамический руль"
+  },
+  "description": {
+    "en": "Actuated control surface for atmospheric steering.",
+    "ru": "Управляемая аэродинамическая поверхность для манёвров в атмосфере."
+  },
+  "category": "control",
+  "dryMass": 15,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.3,
+  "nodeStrength": 200000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.6,
+    "h": 0.8
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.3,
+        0.4
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 0.5,
+      "kind": "radial"
+    }
+  ]
+}

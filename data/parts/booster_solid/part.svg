@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="20" y="8" width="24" height="42" rx="1" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="20" y1="18" x2="44" y2="18" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M 20 50 L 14 62 L 50 62 L 44 50 Z" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="18" y1="58" x2="46" y2="58" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+</svg>

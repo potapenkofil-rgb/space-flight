@@ -1,0 +1,37 @@
+{
+  "id": "legs_heavy",
+  "name": {
+    "en": "Landing Legs Heavy",
+    "ru": "Опоры тяжёлые"
+  },
+  "description": {
+    "en": "Reinforced landing legs, tolerate a harder touchdown.",
+    "ru": "Усиленные опоры, допускают более жёсткое касание."
+  },
+  "category": "legs",
+  "dryMass": 140,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.3,
+  "nodeStrength": 550000,
+  "maxLandingSpeed": 9,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1,
+    "h": 1.6
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.5,
+        0.8
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 1,
+      "kind": "radial"
+    }
+  ]
+}

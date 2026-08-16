@@ -1,0 +1,54 @@
+{
+  "id": "tank_rcs",
+  "name": {
+    "en": "RCS Fuel Tank",
+    "ru": "Бак РСУ"
+  },
+  "description": {
+    "en": "Dedicated monopropellant tank for RCS thrusters.",
+    "ru": "Отдельный бак монотоплива для блоков РСУ."
+  },
+  "category": "rcs",
+  "dryMass": 45,
+  "resources": [
+    {
+      "id": "rcsFuel",
+      "capacity": 400
+    }
+  ],
+  "engine": null,
+  "dragArea": 0.5,
+  "nodeStrength": 420000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 0.8,
+    "h": 1
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        1
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

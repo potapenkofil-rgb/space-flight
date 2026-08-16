@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kármán — part contact sheet</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #070a11;
+        color: #dee6f1;
+        font-family: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+      }
+      #sheet {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        padding: 16px;
+      }
+      .cell {
+        background: #0d131e;
+        border: 1px solid #22304a;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .cell canvas {
+        background: #0d131e;
+      }
+      .cell .label {
+        margin-top: 4px;
+        font-size: 10px;
+        letter-spacing: 0.05em;
+        color: #a3b0c4;
+        text-transform: uppercase;
+        text-align: center;
+      }
+      .cell .category {
+        font-size: 9px;
+        color: #6d7c93;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sheet"></div>
+  </body>
+</html>

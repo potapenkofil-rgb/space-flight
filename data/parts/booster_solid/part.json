@@ -1,0 +1,50 @@
+{
+  "id": "booster_solid",
+  "name": {
+    "en": "Solid Booster",
+    "ru": "Твердотопливный ускоритель"
+  },
+  "description": {
+    "en": "Self-contained solid-fuel booster. No throttle, no shutoff, burns to depletion.",
+    "ru": "Автономный твердотопливный ускоритель. Без дросселирования и отключения, горит до выработки."
+  },
+  "category": "boosters",
+  "dryMass": 500,
+  "resources": [
+    {
+      "id": "solidFuel",
+      "capacity": 2200
+    }
+  ],
+  "engine": {
+    "thrustVac": 220000,
+    "thrustSl": 195000,
+    "ispVac": 195,
+    "ispSl": 165,
+    "gimbalDeg": 0,
+    "minThrottle": 1,
+    "fuel": "solidFuel"
+  },
+  "dragArea": 1.3,
+  "nodeStrength": 700000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.2,
+    "h": 4
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        4
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

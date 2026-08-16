@@ -1,0 +1,66 @@
+{
+  "id": "tank_l1",
+  "name": {
+    "en": "Fuel Tank L",
+    "ru": "Бак большой"
+  },
+  "description": {
+    "en": "Large liquid-fuel tank, wide 2.4 m stack.",
+    "ru": "Большой бак с жидким топливом, широкий стык 2,4 м."
+  },
+  "category": "tanks",
+  "dryMass": 1400,
+  "resources": [
+    {
+      "id": "fuel",
+      "capacity": 12600
+    }
+  ],
+  "engine": null,
+  "dragArea": 3.6,
+  "nodeStrength": 900000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 2.4,
+    "h": 7
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 2,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        7
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 2,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        1.2,
+        3.5
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 2,
+      "kind": "radial"
+    }
+  ]
+}

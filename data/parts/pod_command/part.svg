@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="18" y="8" width="28" height="34" rx="2" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 18 42 L 46 42" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M 22 18 L 42 18" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M 18 8 Q 32 -4 46 8 L 46 8 L 18 8 Z" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="24" r="7" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 32 17 L 32 31 M 25 24 L 39 24" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+</svg>

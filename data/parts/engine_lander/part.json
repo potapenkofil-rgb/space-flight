@@ -1,0 +1,45 @@
+{
+  "id": "engine_lander",
+  "name": {
+    "en": "Landing Engine",
+    "ru": "Посадочный двигатель"
+  },
+  "description": {
+    "en": "Deep-throttling engine for powered descent, wide gimbal range.",
+    "ru": "Двигатель с глубоким дросселированием для посадки, широкий угол качания."
+  },
+  "category": "engines",
+  "dryMass": 380,
+  "resources": [],
+  "engine": {
+    "thrustVac": 45000,
+    "thrustSl": 38000,
+    "ispVac": 310,
+    "ispSl": 260,
+    "gimbalDeg": 10,
+    "minThrottle": 0.1,
+    "fuel": "fuel"
+  },
+  "dragArea": 0.5,
+  "nodeStrength": 480000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.2,
+    "h": 1.3
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        1.3
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

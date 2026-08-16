@@ -1,0 +1,50 @@
+{
+  "id": "rcs_block",
+  "name": {
+    "en": "RCS Thruster Block",
+    "ru": "Блок РСУ"
+  },
+  "description": {
+    "en": "Four-way reaction-control thruster block with a small internal propellant reserve.",
+    "ru": "Четырёхсопловый блок реактивной системы управления с небольшим запасом топлива."
+  },
+  "category": "rcs",
+  "dryMass": 25,
+  "resources": [
+    {
+      "id": "rcsFuel",
+      "capacity": 40
+    }
+  ],
+  "engine": {
+    "thrustVac": 400,
+    "thrustSl": 350,
+    "ispVac": 220,
+    "ispSl": 180,
+    "gimbalDeg": 0,
+    "minThrottle": 0,
+    "fuel": "rcsFuel"
+  },
+  "dragArea": 0.2,
+  "nodeStrength": 250000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.5,
+    "h": 0.5
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.25,
+        0.25
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 0.5,
+      "kind": "radial"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "example",
+  "bodies": [
+    {
+      "id": "example_body",
+      "mu": 4.0e11,
+      "radius": 400000,
+      "rotationPeriod": 18000,
+      "atmosphere": null,
+      "parent": null,
+      "orbit": null
+    }
+  ]
+}

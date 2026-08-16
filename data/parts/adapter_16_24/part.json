@@ -1,0 +1,49 @@
+{
+  "id": "adapter_16_24",
+  "name": {
+    "en": "Size Adapter 1.6→2.4",
+    "ru": "Переходник 1,6→2,4"
+  },
+  "description": {
+    "en": "Tapers a 1.6 m stack up to the wide 2.4 m size.",
+    "ru": "Переходит со стандартного диаметра 1,6 м на широкий 2,4 м."
+  },
+  "category": "adapters",
+  "dryMass": 120,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.8,
+  "nodeStrength": 650000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 2.4,
+    "h": 0.8
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        0.8
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 2,
+      "kind": "stack"
+    }
+  ]
+}

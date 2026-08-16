@@ -1,0 +1,66 @@
+{
+  "id": "tank_s1",
+  "name": {
+    "en": "Fuel Tank S",
+    "ru": "Бак малый"
+  },
+  "description": {
+    "en": "Small liquid-fuel tank, standard 1.6 m stack.",
+    "ru": "Малый бак с жидким топливом, стандартный стык 1,6 м."
+  },
+  "category": "tanks",
+  "dryMass": 300,
+  "resources": [
+    {
+      "id": "fuel",
+      "capacity": 2700
+    }
+  ],
+  "engine": null,
+  "dragArea": 1.4,
+  "nodeStrength": 480000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 1.6,
+    "h": 3.2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        3.2
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0.8,
+        1.6
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 1,
+      "kind": "radial"
+    }
+  ]
+}

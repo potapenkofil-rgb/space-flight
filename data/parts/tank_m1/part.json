@@ -1,0 +1,66 @@
+{
+  "id": "tank_m1",
+  "name": {
+    "en": "Fuel Tank M",
+    "ru": "Бак средний"
+  },
+  "description": {
+    "en": "Medium liquid-fuel tank, standard 1.6 m stack.",
+    "ru": "Средний бак с жидким топливом, стандартный стык 1,6 м."
+  },
+  "category": "tanks",
+  "dryMass": 600,
+  "resources": [
+    {
+      "id": "fuel",
+      "capacity": 5400
+    }
+  ],
+  "engine": null,
+  "dragArea": 2.2,
+  "nodeStrength": 560000,
+  "maxLandingSpeed": 0,
+  "crossfeed": true,
+  "bounds": {
+    "w": 1.6,
+    "h": 6
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        6
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0.8,
+        3
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 1,
+      "kind": "radial"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "id": "truss_strut",
+  "name": {
+    "en": "Truss",
+    "ru": "Ферма"
+  },
+  "description": {
+    "en": "Plain structural truss segment; no resources, high node strength.",
+    "ru": "Простой ферменный сегмент; без ресурсов, высокая прочность узла."
+  },
+  "category": "structural",
+  "dryMass": 30,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.1,
+  "nodeStrength": 600000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.3,
+    "h": 1.2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        1.2
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

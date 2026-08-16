@@ -1,0 +1,45 @@
+{
+  "id": "engine_launch",
+  "name": {
+    "en": "Liftoff Engine",
+    "ru": "Стартовый двигатель"
+  },
+  "description": {
+    "en": "Sea-level optimized first-stage engine. High thrust, modest vacuum Isp.",
+    "ru": "Двигатель первой ступени, оптимизированный под уровень моря. Высокая тяга, скромный вакуумный Isp."
+  },
+  "category": "engines",
+  "dryMass": 1450,
+  "resources": [],
+  "engine": {
+    "thrustVac": 210000,
+    "thrustSl": 190000,
+    "ispVac": 295,
+    "ispSl": 255,
+    "gimbalDeg": 8,
+    "minThrottle": 0.4,
+    "fuel": "fuel"
+  },
+  "dragArea": 1.6,
+  "nodeStrength": 950000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.6,
+    "h": 2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        2
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

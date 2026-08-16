@@ -1,0 +1,54 @@
+{
+  "id": "power_battery",
+  "name": {
+    "en": "Battery",
+    "ru": "Батарея"
+  },
+  "description": {
+    "en": "Rechargeable electricity storage pack, stack-mountable.",
+    "ru": "Аккумуляторный блок хранения электроэнергии, устанавливается в стек."
+  },
+  "category": "power",
+  "dryMass": 50,
+  "resources": [
+    {
+      "id": "electricity",
+      "capacity": 200
+    }
+  ],
+  "engine": null,
+  "dragArea": 0.2,
+  "nodeStrength": 350000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.8,
+    "h": 0.6
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        0.6
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

@@ -11,7 +11,8 @@
  * that math.
  */
 import { v2, type Vec2 } from '../math/vec2';
-import { stateFromOrbit, type Body, type Orbit } from '../orbits/types';
+import { stateFromOrbit } from '../orbits/kepler';
+import type { Body, Orbit } from '../orbits/types';
 import { issue, type Issue } from './errors';
 import { validateSystemFields, type RawBody } from './system-schema';
 

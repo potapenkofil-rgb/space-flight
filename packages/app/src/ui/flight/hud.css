@@ -1,0 +1,212 @@
+/**
+ * Flight HUD (DESIGN.md §3): 1px Hairline panel frames, no rounded corners,
+ * Burn corner ticks at 55% opacity, everything docked to an edge — nothing
+ * floats, nothing enters the central 50%-height/40%-width zone the rocket
+ * owns. Every panel below is pinned to one screen edge with a narrow
+ * cross-axis extent well inside that margin, so the "no overlap" rule holds
+ * regardless of viewport size (see `flight.e2e` for the automated check).
+ */
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-body);
+}
+
+.hud-panel {
+  position: fixed;
+  background: var(--color-panel);
+  border: var(--hairline-width) solid var(--color-hairline);
+  padding: 10px 12px;
+  pointer-events: auto;
+}
+
+.hud-panel-corner {
+  position: absolute;
+  width: var(--corner-tick-length);
+  height: var(--corner-tick-length);
+  opacity: var(--corner-tick-opacity);
+  pointer-events: none;
+}
+.hud-panel-corner.tl {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--color-burn);
+  border-left: 2px solid var(--color-burn);
+}
+.hud-panel-corner.tr {
+  top: -1px;
+  right: -1px;
+  border-top: 2px solid var(--color-burn);
+  border-right: 2px solid var(--color-burn);
+}
+.hud-panel-corner.bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom: 2px solid var(--color-burn);
+  border-left: 2px solid var(--color-burn);
+}
+.hud-panel-corner.br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--color-burn);
+  border-right: 2px solid var(--color-burn);
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.hud-row + .hud-row {
+  margin-top: 6px;
+}
+
+.hud-value {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  font-size: var(--font-size-3);
+}
+.hud-unit {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+  font-size: var(--font-size-1);
+  margin-left: 2px;
+}
+
+.hud-big-number {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  font-size: var(--font-size-7);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.hud-big-number .hud-unit {
+  font-size: var(--font-size-3);
+}
+
+/* -- Atmosphere / G-load: top-left -- */
+.hud-panel--atmo {
+  top: 0;
+  left: 0;
+  width: 200px;
+}
+
+/* -- Throttle: left edge, vertical, below the atmo panel -- */
+.hud-panel--throttle {
+  top: 158px;
+  left: 0;
+  bottom: 44px;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.hud-throttle-track {
+  position: relative;
+  flex: 1;
+  width: 22px;
+  background: var(--color-panel-alt);
+  border: var(--hairline-width) solid var(--color-hairline-soft);
+}
+.hud-throttle-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-burn);
+}
+.hud-throttle-tick {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  height: 1px;
+  background: var(--color-hairline-soft);
+}
+
+/* -- Altitude: top-right -- */
+.hud-panel--altitude {
+  top: 0;
+  right: 0;
+  width: 240px;
+}
+
+/* -- Speed: bottom-right -- */
+.hud-panel--speed {
+  bottom: 44px;
+  right: 0;
+  width: 240px;
+}
+
+/* -- Status lamp row: full-width strip pinned to the very bottom -- */
+.hud-lamp-row {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  background: var(--color-panel);
+  border-top: var(--hairline-width) solid var(--color-hairline);
+  pointer-events: auto;
+}
+
+.hud-lamp {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-lamp-dot {
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-panel-alt);
+}
+.hud-lamp[data-state='nominal'] .hud-lamp-dot {
+  background: var(--color-nominal);
+  border-color: var(--color-nominal);
+}
+.hud-lamp[data-state='warning'] .hud-lamp-dot {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+}
+.hud-lamp[data-state='critical'] .hud-lamp-dot {
+  background: var(--color-critical);
+  border-color: var(--color-critical);
+}
+.hud-lamp[data-state='burn'] .hud-lamp-dot {
+  background: var(--color-burn);
+  border-color: var(--color-burn);
+}
+
+.hud-lamp-label {
+  font-family: var(--font-data);
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+.hud-lamp[data-state='nominal'] .hud-lamp-label,
+.hud-lamp[data-state='warning'] .hud-lamp-label,
+.hud-lamp[data-state='critical'] .hud-lamp-label,
+.hud-lamp[data-state='burn'] .hud-lamp-label {
+  color: var(--color-ink);
+}
+
+.hud-map-hint {
+  margin-left: auto;
+  font-family: var(--font-data);
+  font-size: var(--font-size-1);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}

@@ -39,6 +39,16 @@ describe('formatNumber', () => {
   it('normalizes -0 to 0', () => {
     expect(formatNumber(-0)).toBe('0');
   });
+  it('normalizes a small negative value that rounds to zero to 0, not −0', () => {
+    // e.g. an altitude a few centimetres below the pad, rendered whole-metre —
+    // this must not show as "−0 м" on the HUD altimeter.
+    expect(formatNumber(-0.3)).toBe('0');
+    expect(formatNumber(-0.004, 2)).toBe('0,00');
+  });
+  it('still shows the minus sign once the magnitude no longer rounds to zero', () => {
+    expect(formatNumber(-0.6)).toBe('−1');
+    expect(formatNumber(-1)).toBe('−1');
+  });
   it('handles non-finite input', () => {
     expect(formatNumber(Infinity)).toBe('∞');
     expect(formatNumber(-Infinity)).toBe('−∞');

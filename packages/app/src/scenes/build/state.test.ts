@@ -71,6 +71,26 @@ describe('stack attachment', () => {
     const allPartIds = state.stages.flatMap((s) => s.partIds);
     expect(new Set(allPartIds).size).toBe(6);
   });
+
+  it('attaches a part below an open downward-facing node without a spurious 180° flip (regression)', () => {
+    // Building nose-first: pod as the root, then a tank attached *below* it —
+    // the reverse of every other test in this file, and exactly the order
+    // `bestOwnNode` used to get wrong (it always grabbed the held part's most
+    // downward-facing node, ignoring which way the target node it was mating
+    // with actually pointed — harmless for this symmetric tank, but the
+    // equivalent mistake on an engine points its thrust into the ground; see
+    // `bestOwnNode`'s doc comment and `topDownAssembly.test.ts`).
+    let state = placeRoot(createEmptyState(), FIXTURE_PARTS, 'pod_capsule');
+    const candidates = findAttachCandidates(state, FIXTURE_PARTS, 'tank_s1');
+    // The pod's bottom node (dir (0,-1)) — attaching "below" it.
+    const downward = candidates.find((c) => c.transform.position.y < 0);
+    if (!downward) throw new Error('expected a candidate attaching below the pod');
+    state = attachPart(state, FIXTURE_PARTS, 'tank_s1', downward);
+    const tank = state.parts[1];
+    if (!tank) throw new Error('expected the tank to be placed');
+    expect(tank.rotation).toBeCloseTo(0, 9);
+    expect(tank.position.y).toBeLessThan(0);
+  });
 });
 
 describe('radial attachment + live symmetry', () => {

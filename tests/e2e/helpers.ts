@@ -28,10 +28,21 @@ export async function gotoHangar(page: Page): Promise<void> {
   await expect(page.getByTestId('build-overlay')).toBeVisible();
 }
 
-/** Builds the smallest launch-worthy vessel (an engine plus a pod) and launches it — the fastest path to a flying vessel for tests that don't care which rocket it is. */
+/**
+ * Builds the smallest launch-worthy vessel that can actually fly (an engine,
+ * a fuel tank, a pod) and launches it — the fastest path to a flying vessel
+ * for tests that don't care which rocket it is. `engine_launch` alone has no
+ * `resources` of its own (PLAN.md §6.1: fuel lives in tanks, not engines), so
+ * an engine-plus-pod vessel is launch-*legal* but carries zero propellant —
+ * `pnpm e2e`'s own "full throttle climbs off the pad" test caught this: full
+ * throttle produced zero actual thrust (`burnEngines` has nothing to draw
+ * from) and the vessel just sat there. A tank in between gives it something
+ * to burn.
+ */
 export async function buildMinimalVesselAndLaunch(page: Page): Promise<void> {
   await gotoHangar(page);
   await placePart(page, 'engine_launch', 'engines');
+  await placePart(page, 'tank_s1', 'tanks');
   await placePart(page, 'pod_command', 'pod');
   await expect(page.getByTestId('build-launch')).toBeEnabled();
   await page.getByTestId('build-launch').click();

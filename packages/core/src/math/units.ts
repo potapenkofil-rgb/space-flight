@@ -52,14 +52,18 @@ function groupDigits(digits: string): string {
  * digits) and a fixed number of fractional digits (`fractionDigits`, default 0).
  * The decimal separator follows the current {@link UnitsLocale} (`,` for `ru`,
  * `.` for `en`). Does not append a unit — see `formatDistance`/`formatSpeed`/
- * `formatMass` for that. `-0` is normalized to `0`.
+ * `formatMass` for that. `-0` is normalized to `0`, and so is any negative value
+ * that *rounds* to zero at the requested `fractionDigits` (e.g. `-0.2` at 0
+ * fractional digits) — otherwise a vessel sitting a few centimetres into the
+ * ground reads as an alarming "−0 м" on the altimeter instead of "0 м".
  */
 export function formatNumber(value: number, fractionDigits = 0): string {
   if (!Number.isFinite(value)) {
     return value > 0 ? '∞' : Number.isNaN(value) ? 'NaN' : '−∞';
   }
-  const sign = value < 0 ? '−' : '';
   const fixed = Math.abs(value).toFixed(fractionDigits);
+  const roundsToZero = Number(fixed) === 0;
+  const sign = value < 0 && !roundsToZero ? '−' : '';
   const [intPart, fracPart] = fixed.split('.') as [string, string | undefined];
   const grouped = groupDigits(intPart);
   return fracPart === undefined ? sign + grouped : sign + grouped + decimalSeparator() + fracPart;

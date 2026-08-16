@@ -154,17 +154,36 @@ export function listOpenNodes(state: BuildState, parts: PartLibrary): OpenNode[]
   return out;
 }
 
-/** Picks the held part's own node that best mates with a target node pointed in `targetWorldDir` (its own local dir must end up antiparallel once rotated — for our single-axis stack/radial nodes this is just "closest to opposite"). */
-function bestOwnNode(def: PartDef, kind: AttachNode['kind'], size: number): number | null {
+/**
+ * Picks the held part's own node that best mates with a target node pointed in
+ * `targetWorldDir`. `computeAttachTransform` will make *any* kind/size-compatible
+ * node coincide with the target and face into it — but which node gets chosen
+ * still decides the resulting rotation, because a part's other nodes generally
+ * point a different way in its *local* frame (e.g. a stack part's bottom node is
+ * `dir (0,-1)`, its top node `dir (0,1)`, 180° apart). Picking the wrong one
+ * forces `computeAttachTransform` to spin the whole part 180° to make the chosen
+ * node line up — harmless for a symmetric tank, but for an engine (PLAN.md §6.1,
+ * §5.5; `fuel.ts`'s thrust direction is the part's own local +Y) it flips the
+ * nozzle to face the sky instead of the ground.
+ *
+ * The fix: choose the own node whose *local* direction is already most nearly
+ * antiparallel to `targetWorldDir` (minimises `dot(node.dir, targetWorldDir)`) —
+ * that is the node that needs the *least* rotation to face the target, so
+ * attaching "below" an open node facing down picks the part's own top/mount
+ * node, and attaching "above" an open node facing up picks its bottom node,
+ * regardless of which direction the assembly is being built in. A 180° flip
+ * only ever happens now when it's the only way to mate compatible nodes at all
+ * (e.g. every candidate node points the same way), not as a side effect of an
+ * arbitrary tie-break.
+ */
+function bestOwnNode(def: PartDef, kind: AttachNode['kind'], size: number, targetWorldDir: Vec2): number | null {
   let best: number | null = null;
   let bestDot = Number.POSITIVE_INFINITY;
   def.nodes.forEach((node, i) => {
     if (node.kind !== kind || node.size !== size) return;
-    // Prefer the node whose local direction has the most negative y (a "bottom"-
-    // facing node) when several of the same kind exist, so stack parts default
-    // to extending predictably; any single compatible node is otherwise fine.
-    if (node.dir.y < bestDot) {
-      bestDot = node.dir.y;
+    const dot = v2.dot(node.dir, targetWorldDir);
+    if (dot < bestDot) {
+      bestDot = dot;
       best = i;
     }
   });
@@ -200,7 +219,7 @@ export function findAttachCandidates(state: BuildState, parts: PartLibrary, held
   const open = listOpenNodes(state, parts);
   const out: AttachCandidate[] = [];
   for (const target of open) {
-    const ownNodeIndex = bestOwnNode(heldDef, target.node.kind, target.node.size);
+    const ownNodeIndex = bestOwnNode(heldDef, target.node.kind, target.node.size, target.worldDir);
     if (ownNodeIndex === null) continue;
     const ownNode = heldDef.nodes[ownNodeIndex];
     if (!ownNode || !nodesCompatible(ownNode, target.node)) continue;

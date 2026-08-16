@@ -15,6 +15,11 @@ describe('loadContent', () => {
     expect(system.get('luna').orbit?.a).toBe(6_000_000);
   });
 
+  it('also exposes the flat body list (SystemLibrary itself only exposes root/get)', () => {
+    const { bodies } = loadContent();
+    expect(bodies.map((b) => b.id)).toEqual(['luna', 'terra']);
+  });
+
   it('returns parts sorted deterministically by id', () => {
     const { library } = loadContent();
     const ids = library.all().map((p) => p.id);

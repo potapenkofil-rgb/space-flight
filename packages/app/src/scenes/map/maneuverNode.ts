@@ -7,14 +7,12 @@
  *
  * The actual state→orbit conversion is delegated through an injectable
  * `OrbitKernel` whose three methods are typed to match `@karman/core`'s
- * `orbitFromState`/`stateFromOrbit`/`timeToTrueAnomaly` exactly (PLAN.md §4)
- * — so passing the real `@karman/core` module in once Agent A's branch lands
- * works with no change here. The default kernel is the local fixture in
- * `fixtures/localOrbitMath.ts` (see that file's doc for why it exists).
+ * `orbitFromState`/`stateFromOrbit`/`timeToTrueAnomaly` exactly (PLAN.md §4),
+ * defaulting to the real ones — kept injectable (rather than calling
+ * `@karman/core` directly) purely so tests can swap in a different kernel if
+ * ever needed, not because the real one is unavailable.
  */
-import type { Orbit, Vec2 } from '@karman/core';
-import { v2 } from '@karman/core';
-import { localOrbitFromState, localStateFromOrbit, localTimeToTrueAnomaly } from './fixtures/localOrbitMath';
+import { orbitFromState, stateFromOrbit, timeToTrueAnomaly, v2, type Orbit, type Vec2 } from '@karman/core';
 
 export interface OrbitKernel {
   orbitFromState(r: Vec2, v: Vec2, mu: number, t: number): Orbit;
@@ -22,12 +20,8 @@ export interface OrbitKernel {
   timeToTrueAnomaly(o: Orbit, nu: number, from: number): number;
 }
 
-/** The fixture kernel — see module doc. Swap for `@karman/core` once Agent A's orbits land. */
-export const FIXTURE_ORBIT_KERNEL: OrbitKernel = {
-  orbitFromState: localOrbitFromState,
-  stateFromOrbit: localStateFromOrbit,
-  timeToTrueAnomaly: localTimeToTrueAnomaly,
-};
+/** `@karman/core`'s real Kepler mechanics (PLAN.md §4/§5.1), wrapped to the `OrbitKernel` shape. */
+export const REAL_ORBIT_KERNEL: OrbitKernel = { orbitFromState, stateFromOrbit, timeToTrueAnomaly };
 
 /**
  * Assumed constant acceleration used to estimate burn duration, m/s².
@@ -85,7 +79,7 @@ export function previewManeuver(
   currentOrbit: Orbit,
   node: ManeuverNode,
   nowTime: number,
-  kernel: OrbitKernel = FIXTURE_ORBIT_KERNEL
+  kernel: OrbitKernel = REAL_ORBIT_KERNEL
 ): ManeuverPreview {
   const nodeTime = kernel.timeToTrueAnomaly(currentOrbit, node.trueAnomaly, nowTime);
   const { r, v } = kernel.stateFromOrbit(currentOrbit, nodeTime);

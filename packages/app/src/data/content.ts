@@ -33,6 +33,7 @@ import {
   createSystemLibrary,
   loadParts,
   loadSystem,
+  type Body,
   type Issue,
   type PartLibrary,
   type PartOverride,
@@ -43,6 +44,16 @@ import {
 export interface ContentLoadResult {
   readonly library: PartLibrary;
   readonly system: SystemLibrary;
+  /**
+   * Every body in the system, flat (root plus every child), in ascending-id
+   * order. `SystemLibrary` itself only exposes `root`/`get(id)` (PLAN.md §4)
+   * — deliberately narrow — but the map's focus switcher and
+   * `createTrajectoryPredictor` (its own doc: "needs the flat list of every
+   * body in the system up front") both need to enumerate every body, so this
+   * bridge keeps the flat list `loadSystem` already produces internally
+   * instead of discarding it.
+   */
+  readonly bodies: readonly Body[];
   /** Every part validation problem, part or system (PLAN.md §6.2) — never fatal. */
   readonly issues: readonly Issue[];
   /** Every part `id` collision resolved while merging (empty until mods are wired — see module doc). */
@@ -130,7 +141,8 @@ export function loadContent(): ContentLoadResult {
   }
 
   const system = createSystemLibrary(systemResult.root, systemResult.bodies);
+  const bodies: Body[] = [...systemResult.bodies.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  cached = { library, system, issues, overrides: partsResult.overrides };
+  cached = { library, system, bodies, issues, overrides: partsResult.overrides };
   return cached;
 }

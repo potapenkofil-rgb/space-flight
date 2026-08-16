@@ -1,15 +1,28 @@
 /**
- * The map scene (PLAN.md §7 Agent D / DESIGN.md §5): current orbit, apo/pe
- * markers, sphere-of-influence boundary, focus switching between bodies and
- * vessels, and the maneuver node (place by clicking the orbit, drag its
- * prograde/retrograde and radial handles, preview the resulting orbit).
+ * The map scene (PLAN.md §7 Agent D / DESIGN.md §5 / §7 stage-2 integration):
+ * current orbit, apo/pe markers, sphere-of-influence boundary, focus
+ * switching between bodies and vessels, the maneuver node (place by clicking
+ * the orbit, drag its prograde/retrograde and radial handles, preview the
+ * resulting orbit), and — new in this integration pass — the predicted
+ * trajectory across an SOI transition (`createTrajectoryPredictor`, PLAN.md
+ * §7 Agent A), so planning a burn toward the Moon actually shows the
+ * approach and capture, not just the first leg.
  *
- * Drives the vessel/body fixtures in `fixtures/**` instead of a real
- * `SystemLibrary`/vessel registry (Agent E/F, not landed yet) — see those
- * files' docs for what the orchestrator swaps in later.
+ * Reads real content through `mapSource.ts` (the loaded `SystemLibrary` +
+ * the shared session's `VesselRegistry`) instead of the local fixtures this
+ * scene used to drive — see that file's doc.
  */
 import { getLocale, onLocaleChange, t } from '../../i18n';
-import { formatDeltaV, formatDistance, setUnitsLocale, v2, type Vec2 } from '@karman/core';
+import {
+  createTrajectoryPredictor,
+  formatDeltaV,
+  formatDistance,
+  setUnitsLocale,
+  v2,
+  type ConicSegment,
+  type Orbit,
+  type Vec2,
+} from '@karman/core';
 import {
   createCamera,
   screenToWorld,
@@ -26,9 +39,9 @@ import {
 } from '../../render/orbit-renderer';
 import { drawBackground } from '../../render/world-renderer';
 import { getColor, getFont, getFontSizePx } from '../../ui/tokens';
-import { getMapBodyFixture, MAP_BODY_FIXTURES, type MapBodyFixture } from './fixtures/bodies';
-import { getMapVesselFixture, MAP_VESSEL_FIXTURES, type MapVesselFixture } from './fixtures/vessels';
-import { FIXTURE_ORBIT_KERNEL } from './maneuverNode';
+import { getSession } from '../../game/session';
+import { listMapBodies, listMapVessels, type MapBodyView, type MapVesselView } from './mapSource';
+import { REAL_ORBIT_KERNEL } from './maneuverNode';
 import {
   createManeuverNode,
   nearestTrueAnomaly,
@@ -47,16 +60,14 @@ const HANDLE_BASE_OFFSET_PX = 34;
 const HANDLE_SCALE_PX_PER_MPS = 0.6;
 const DELTA_V_PER_HANDLE_PX = 1 / HANDLE_SCALE_PX_PER_MPS;
 const HIT_TEST_SAMPLE_COUNT = 360;
-const NOW_TIME = 0; // fixed "current time" for the demo — see module doc
+/** How far ahead to predict a post-burn trajectory, s — comfortably past Luna's ~8.2h period (PLAN.md §5.7) so a transfer's SOI entry/exit both show up. */
+const PREDICT_HORIZON_SECONDS = 40 * 24 * 3600;
+const PREDICT_MAX_SEGMENTS = 6;
+const SOI_TRANSITION_MARKER_RADIUS_PX = 4;
 
 type DragMode = 'prograde' | 'radial' | null;
 
-function bodyById(id: string): MapBodyFixture {
-  return getMapBodyFixture(id);
-}
-function vesselById(id: number): MapVesselFixture {
-  return getMapVesselFixture(id);
-}
+export type MapNavigate = (scene: 'menu' | 'flight') => void;
 
 function hitTestAnomalies(): number[] {
   const out: number[] = [];
@@ -65,10 +76,31 @@ function hitTestAnomalies(): number[] {
 }
 const HIT_TEST_ANOMALIES = hitTestAnomalies();
 
-export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): () => void {
+/**
+ * Mounts the map scene. `navigate` switches to another scene (`M` → flight,
+ * `Esc` → menu) — injected by the router instead of the old
+ * `window.location.href` page-navigation hack.
+ */
+export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, navigate: MapNavigate): () => void {
   const context = canvas.getContext('2d');
   if (!context) throw new Error('mountMapScene: 2D canvas context unavailable');
   const ctx: CanvasRenderingContext2D = context;
+
+  const session = getSession();
+  const nowTime = session.simTime;
+  const bodies = listMapBodies();
+  const vessels = listMapVessels(nowTime);
+  if (bodies.length === 0) throw new Error('mountMapScene: no bodies loaded');
+  const predictor = createTrajectoryPredictor(bodies.map((b) => b.body));
+
+  function bodyById(id: string): MapBodyView {
+    const found = bodies.find((b) => b.id === id);
+    if (!found) throw new Error(`mountMapScene: unknown body "${id}"`);
+    return found;
+  }
+  function vesselById(id: number): MapVesselView | undefined {
+    return vessels.find((v) => v.id === id);
+  }
 
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   let widthPx = window.innerWidth;
@@ -92,24 +124,26 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
     syncPanels();
   });
 
-  let focusVesselId = MAP_VESSEL_FIXTURES[0]!.id;
-  let focusBodyId = vesselById(focusVesselId).bodyId;
+  const firstVessel = vessels[0];
+  let focusVesselId: number | null = firstVessel?.id ?? null;
+  let focusBodyId = firstVessel ? firstVessel.bodyId : bodies[0]!.id;
   let node: ManeuverNode | null = null;
   let dragMode: DragMode = null;
 
   function fitCameraToBody(bodyId: string): Camera {
-    const body = bodyById(bodyId);
-    const vessel = vesselById(focusVesselId);
+    const bodyView = bodyById(bodyId);
+    const body = bodyView.body;
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
     // Frame whichever is largest: the body's own disc, its vessel's orbit (if
     // that vessel is around this body), or its sphere of influence — otherwise
     // the SOI boundary (DESIGN.md §5) is real but zoomed-in-past, since a body's
     // SOI is typically several times its own radius (e.g. Luna's SOI is ~3.7x
     // its radius) and would never appear on screen at "just show the body" zoom.
     const soiExtent = Number.isFinite(body.soiRadius) ? body.soiRadius * 2.2 : 0;
-    const orbitExtent = vessel.bodyId === bodyId ? vessel.orbit.a * (1 + vessel.orbit.e) * 2.4 : 0;
+    const orbitExtent = vessel && vessel.bodyId === bodyId ? vessel.orbit.a * (1 + vessel.orbit.e) * 2.4 : 0;
     const extentM = Math.max(body.radius * 2.4, soiExtent, orbitExtent);
     const ppm = Math.min(widthPx, heightPx) / extentM;
-    return createCamera(body.position, Math.min(Math.max(ppm, MIN_PPM), MAX_PPM));
+    return createCamera(body.positionAt(nowTime), Math.min(Math.max(ppm, MIN_PPM), MAX_PPM));
   }
 
   let camera: Camera = fitCameraToBody(focusBodyId);
@@ -132,17 +166,17 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
   const bodyGroup = document.createElement('div');
   bodyGroup.className = 'map-focus-group';
   const bodyButtons = new Map<string, HTMLButtonElement>();
-  for (const body of MAP_BODY_FIXTURES) {
+  for (const bodyView of bodies) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'map-focus-button';
-    btn.dataset['testid'] = `map-focus-body-${body.id}`;
+    btn.dataset['testid'] = `map-focus-body-${bodyView.id}`;
     btn.addEventListener('click', () => {
-      focusBodyId = body.id;
+      focusBodyId = bodyView.id;
       camera = fitCameraToBody(focusBodyId);
       syncPanels();
     });
-    bodyButtons.set(body.id, btn);
+    bodyButtons.set(bodyView.id, btn);
     bodyGroup.appendChild(btn);
   }
 
@@ -151,19 +185,19 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
   const vesselGroup = document.createElement('div');
   vesselGroup.className = 'map-focus-group';
   const vesselButtons = new Map<number, HTMLButtonElement>();
-  for (const vessel of MAP_VESSEL_FIXTURES) {
+  for (const vesselView of vessels) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'map-focus-button';
-    btn.dataset['testid'] = `map-focus-vessel-${vessel.id}`;
+    btn.dataset['testid'] = `map-focus-vessel-${vesselView.id}`;
     btn.addEventListener('click', () => {
-      focusVesselId = vessel.id;
-      focusBodyId = vessel.bodyId;
+      focusVesselId = vesselView.id;
+      focusBodyId = vesselView.bodyId;
       node = null;
       camera = fitCameraToBody(focusBodyId);
       syncPanels();
     });
-    vesselButtons.set(vessel.id, btn);
+    vesselButtons.set(vesselView.id, btn);
     vesselGroup.appendChild(btn);
   }
   focusPanel.append(focusHeading, bodyGroup, vesselHeading, vesselGroup);
@@ -224,20 +258,20 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
       btn.dataset['active'] = String(id === focusBodyId);
     }
     for (const [id, btn] of vesselButtons) {
-      btn.textContent = t(vesselById(id).nameKey);
+      btn.textContent = `${t('MAP_VESSEL_LABEL')} ${id}`;
       btn.dataset['active'] = String(id === focusVesselId);
     }
     hintLeft.textContent = t('MAP_ADD_NODE_HINT');
     hintRight.textContent = t('MAP_FLIGHT_HINT');
     deleteButton.textContent = t('MAP_MANEUVER_DELETE');
 
-    if (!node) {
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (!node || !vessel) {
       nodePanel.style.display = 'none';
       return;
     }
     nodePanel.style.display = '';
-    const vessel = vesselById(focusVesselId);
-    const preview = previewManeuver(vessel.orbit, node, NOW_TIME, FIXTURE_ORBIT_KERNEL);
+    const preview = previewManeuver(vessel.orbit, node, nowTime, REAL_ORBIT_KERNEL);
     timeToRow.label.textContent = t('MAP_MANEUVER_TIME_TO');
     timeToRow.value.textContent = `${Math.round(preview.timeToNode)}${t('MAP_UNIT_SECONDS')}`;
     burnTimeRow.label.textContent = t('MAP_MANEUVER_BURN_TIME');
@@ -245,8 +279,9 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
     deltaVRow.label.textContent = t('MAP_MANEUVER_DELTA_V');
     deltaVRow.value.textContent = formatDeltaV(preview.deltaVMagnitude);
     resultRow.label.textContent = t('MAP_MANEUVER_RESULT');
-    const apo = preview.resultOrbit.a * (1 + preview.resultOrbit.e) - bodyById(vessel.bodyId).radius;
-    const peri = preview.resultOrbit.a * (1 - preview.resultOrbit.e) - bodyById(vessel.bodyId).radius;
+    const bodyRadius = bodyById(vessel.bodyId).body.radius;
+    const apo = preview.resultOrbit.a * (1 + preview.resultOrbit.e) - bodyRadius;
+    const peri = preview.resultOrbit.a * (1 - preview.resultOrbit.e) - bodyRadius;
     resultRow.value.textContent = `${formatDistance(peri)} / ${formatDistance(apo)}`;
   }
   syncPanels();
@@ -258,16 +293,16 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
   }
 
   function handleScreenPositions(): { prograde: Vec2; radial: Vec2 } | null {
-    if (!node) return null;
-    const vessel = vesselById(focusVesselId);
-    const body = bodyById(vessel.bodyId);
-    const { r, v } = FIXTURE_ORBIT_KERNEL.stateFromOrbit(
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (!node || !vessel) return null;
+    const body = bodyById(vessel.bodyId).body;
+    const { r, v } = REAL_ORBIT_KERNEL.stateFromOrbit(
       vessel.orbit,
-      FIXTURE_ORBIT_KERNEL.timeToTrueAnomaly(vessel.orbit, node.trueAnomaly, NOW_TIME)
+      REAL_ORBIT_KERNEL.timeToTrueAnomaly(vessel.orbit, node.trueAnomaly, nowTime)
     );
     const progradeDir = v2.norm(v);
     const radialDir = v2.norm(r);
-    const nodeWorld = v2.add(body.position, r);
+    const nodeWorld = v2.add(body.positionAt(nowTime), r);
     const nodeScreen = worldToScreen(camera, nodeWorld, widthPx, heightPx);
 
     function handlePoint(dir: Vec2, deltaV: number): Vec2 {
@@ -304,16 +339,15 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
     }
 
     // Otherwise: try placing/moving the node if the click landed near the current orbit.
-    // World-space nearest-point search is equivalent to a screen-space one here because
-    // the camera scales x/y isotropically (same pixelsPerMeter both axes).
-    const vessel = vesselById(focusVesselId);
-    const body = bodyById(vessel.bodyId);
-    const worldClick = v2.sub(screenToWorld(camera, p, widthPx, heightPx), body.position);
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (!vessel) return;
+    const body = bodyById(vessel.bodyId).body;
+    const worldClick = v2.sub(screenToWorld(camera, p, widthPx, heightPx), body.positionAt(nowTime));
     const nu = nearestTrueAnomaly(vessel.orbit, worldClick, HIT_TEST_ANOMALIES);
 
     const r = (vessel.orbit.a * (1 - vessel.orbit.e * vessel.orbit.e)) / (1 + vessel.orbit.e * Math.cos(nu));
     const theta = vessel.orbit.argPe + nu;
-    const worldPoint = v2.add(body.position, { x: r * Math.cos(theta), y: r * Math.sin(theta) });
+    const worldPoint = v2.add(body.positionAt(nowTime), { x: r * Math.cos(theta), y: r * Math.sin(theta) });
     const screenDist = v2.len(v2.sub(worldToScreen(camera, worldPoint, widthPx, heightPx), p));
 
     if (screenDist <= ORBIT_HIT_TEST_PX) {
@@ -324,14 +358,15 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
 
   function onPointerMove(evt: PointerEvent): void {
     if (!dragMode || !node) return;
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (!vessel) return;
     const p = toCanvasPoint(evt);
-    const vessel = vesselById(focusVesselId);
-    const body = bodyById(vessel.bodyId);
-    const { r, v } = FIXTURE_ORBIT_KERNEL.stateFromOrbit(
+    const body = bodyById(vessel.bodyId).body;
+    const { r, v } = REAL_ORBIT_KERNEL.stateFromOrbit(
       vessel.orbit,
-      FIXTURE_ORBIT_KERNEL.timeToTrueAnomaly(vessel.orbit, node.trueAnomaly, NOW_TIME)
+      REAL_ORBIT_KERNEL.timeToTrueAnomaly(vessel.orbit, node.trueAnomaly, nowTime)
     );
-    const nodeWorld = v2.add(body.position, r);
+    const nodeWorld = v2.add(body.positionAt(nowTime), r);
     const nodeScreen = worldToScreen(camera, nodeWorld, widthPx, heightPx);
     const dir = dragMode === 'prograde' ? v2.norm(v) : v2.norm(r);
     const dirScreen = v2.norm(v2.sub(worldToScreen(camera, v2.add(nodeWorld, dir), widthPx, heightPx), nodeScreen));
@@ -356,7 +391,8 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
   }
 
   function onKeydown(evt: KeyboardEvent): void {
-    if (evt.code === 'KeyM') window.location.href = 'flight.html';
+    if (evt.code === 'KeyM') navigate('flight');
+    else if (evt.code === 'Escape') navigate('menu');
   }
 
   canvas.addEventListener('pointerdown', onPointerDown);
@@ -367,12 +403,25 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
   window.addEventListener('keydown', onKeydown);
 
   // -- Render loop (map has no physics to step; it just redraws) --
-  function drawApsisLabel(screen: Vec2, altitude: number, color: string): void {
+  // DESIGN.md §5 apsis/handle labels can land on top of each other when a
+  // maneuver node sits right at (or very near) the periapsis it's also
+  // labelling — nudge the node-side label outward along the same radial
+  // direction so the two stay legible instead of overprinting.
+  const LABEL_SEPARATION_PX = 16;
+  function drawApsisLabel(screen: Vec2, altitude: number, color: string, avoid: Vec2 | null): void {
+    let pos = { x: screen.x + 10, y: screen.y };
+    if (avoid) {
+      const d = v2.len(v2.sub(pos, avoid));
+      if (d < LABEL_SEPARATION_PX) {
+        const away = d > 0.01 ? v2.scale(v2.sub(pos, avoid), 1 / d) : { x: 0, y: -1 };
+        pos = v2.add(avoid, v2.scale(away, LABEL_SEPARATION_PX));
+      }
+    }
     ctx.save();
     ctx.font = `${getFontSizePx(0)}px ${getFont('data')}`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
-    ctx.fillText(formatDistance(altitude), screen.x + 10, screen.y);
+    ctx.fillText(formatDistance(altitude), pos.x, pos.y);
     ctx.restore();
   }
 
@@ -389,55 +438,102 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement): (
     ctx.restore();
   }
 
+  /** Draws every predicted leg beyond the vessel's current body (PLAN.md §7 Agent A `TrajectoryPredictor`, §8 step 7: the transfer must show its transition across the Moon's sphere of influence). */
+  function drawPredictedTransfer(vessel: MapVesselView, resultOrbit: Orbit, nodeTime: number): void {
+    const homeBody = bodyById(vessel.bodyId).body;
+    const { r, v } = REAL_ORBIT_KERNEL.stateFromOrbit(resultOrbit, nodeTime);
+    const segments: ConicSegment[] = predictor.predict(
+      { position: r, velocity: v, soi: homeBody, t: nodeTime },
+      PREDICT_HORIZON_SECONDS,
+      PREDICT_MAX_SEGMENTS
+    );
+
+    for (let i = 1; i < segments.length; i++) {
+      const segment = segments[i]!;
+      const segBody = homeBody.id === segment.bodyId ? homeBody : bodyById(segment.bodyId).body;
+      const center = segBody.positionAt(segment.startTime);
+      drawOrbitPath(ctx, camera, center, segment.orbit, 'planned', widthPx, heightPx);
+      if (Number.isFinite(segBody.soiRadius)) {
+        drawSoiBoundary(ctx, camera, center, segBody.soiRadius, widthPx, heightPx);
+      }
+
+      // Mark the SOI-entry point itself, where the previous leg handed off.
+      const entryWorld = segBody.positionAt(segment.startTime);
+      const entryScreen = worldToScreen(camera, entryWorld, widthPx, heightPx);
+      ctx.save();
+      ctx.fillStyle = getColor('burn');
+      ctx.beginPath();
+      ctx.arc(entryScreen.x, entryScreen.y, SOI_TRANSITION_MARKER_RADIUS_PX, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `${getFontSizePx(0)}px ${getFont('data')}`;
+      ctx.fillStyle = getColor('burn');
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(t(bodyById(segment.bodyId).nameKey), entryScreen.x + 8, entryScreen.y - 4);
+      ctx.restore();
+    }
+  }
+
   function render(): void {
     drawBackground(ctx, widthPx, heightPx);
 
-    for (const body of MAP_BODY_FIXTURES) {
-      drawMapBody(ctx, camera, body.position, body.radius, body.atmosphere !== null, widthPx, heightPx);
-      if (body.parentId !== null && Number.isFinite(body.soiRadius)) {
-        drawSoiBoundary(ctx, camera, body.position, body.soiRadius, widthPx, heightPx);
+    for (const bodyView of bodies) {
+      const body = bodyView.body;
+      const position = body.positionAt(nowTime);
+      drawMapBody(ctx, camera, position, body.radius, body.atmosphere !== null, widthPx, heightPx);
+      if (bodyView.parentId !== null && Number.isFinite(body.soiRadius)) {
+        drawSoiBoundary(ctx, camera, position, body.soiRadius, widthPx, heightPx);
       }
     }
 
-    const vessel = vesselById(focusVesselId);
-    const body = bodyById(vessel.bodyId);
+    const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (vessel) {
+      const bodyView = bodyById(vessel.bodyId);
+      const body = bodyView.body;
+      const bodyPosition = body.positionAt(nowTime);
 
-    drawOrbitPath(ctx, camera, body.position, vessel.orbit, 'current', widthPx, heightPx);
-    const currentApsides = drawApsisMarkers(ctx, camera, body.position, vessel.orbit, body.radius, 'current', widthPx, heightPx);
-    drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'));
-    drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'));
+      drawOrbitPath(ctx, camera, bodyPosition, vessel.orbit, 'current', widthPx, heightPx);
+      const currentApsides = drawApsisMarkers(ctx, camera, bodyPosition, vessel.orbit, body.radius, 'current', widthPx, heightPx);
 
-    // Current vessel position marker ("you are here"), at the fixed demo time.
-    const nowState = FIXTURE_ORBIT_KERNEL.stateFromOrbit(vessel.orbit, NOW_TIME);
-    const nowScreen = worldToScreen(camera, v2.add(body.position, nowState.r), widthPx, heightPx);
-    ctx.save();
-    ctx.fillStyle = getColor('ink');
-    ctx.beginPath();
-    ctx.arc(nowScreen.x, nowScreen.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    if (node) {
-      const preview = previewManeuver(vessel.orbit, node, NOW_TIME, FIXTURE_ORBIT_KERNEL);
-      drawOrbitPath(ctx, camera, body.position, preview.resultOrbit, 'planned', widthPx, heightPx);
-      const plannedApsides = drawApsisMarkers(ctx, camera, body.position, preview.resultOrbit, body.radius, 'planned', widthPx, heightPx);
-      drawApsisLabel(plannedApsides.apoapsis.screen, plannedApsides.apoapsis.altitude, getColor('burn'));
-      drawApsisLabel(plannedApsides.periapsis.screen, plannedApsides.periapsis.altitude, getColor('burn'));
-
-      const nodeWorld = v2.add(body.position, preview.worldPos);
-      const nodeScreen = drawManeuverNodeMarker(ctx, camera, nodeWorld, widthPx, heightPx);
-      // DESIGN.md §5: a mono ΔV readout right next to the node glyph itself.
+      // Current vessel position marker ("you are here").
+      const nowState = REAL_ORBIT_KERNEL.stateFromOrbit(vessel.orbit, nowTime);
+      const nowScreen = worldToScreen(camera, v2.add(bodyPosition, nowState.r), widthPx, heightPx);
       ctx.save();
-      ctx.font = `${getFontSizePx(0)}px ${getFont('data')}`;
-      ctx.fillStyle = getColor('burn');
-      ctx.textBaseline = 'top';
-      ctx.fillText(formatDeltaV(preview.deltaVMagnitude), nodeScreen.x + 16, nodeScreen.y + 16);
+      ctx.fillStyle = getColor('ink');
+      ctx.beginPath();
+      ctx.arc(nowScreen.x, nowScreen.y, 3, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
 
-      const handles = handleScreenPositions();
-      if (handles) {
-        drawHandle(handles.prograde, node.progradeDeltaV >= 0 ? 'MAP_MANEUVER_PROGRADE' : 'MAP_MANEUVER_RETROGRADE');
-        drawHandle(handles.radial, node.radialDeltaV >= 0 ? 'MAP_MANEUVER_RADIAL_OUT' : 'MAP_MANEUVER_RADIAL_IN');
+      if (node) {
+        const preview = previewManeuver(vessel.orbit, node, nowTime, REAL_ORBIT_KERNEL);
+        drawOrbitPath(ctx, camera, bodyPosition, preview.resultOrbit, 'planned', widthPx, heightPx);
+        const plannedApsides = drawApsisMarkers(ctx, camera, bodyPosition, preview.resultOrbit, body.radius, 'planned', widthPx, heightPx);
+
+        const nodeWorld = v2.add(bodyPosition, preview.worldPos);
+        const nodeScreen = drawManeuverNodeMarker(ctx, camera, nodeWorld, widthPx, heightPx);
+        // DESIGN.md §5: a mono ΔV readout right next to the node glyph itself.
+        ctx.save();
+        ctx.font = `${getFontSizePx(0)}px ${getFont('data')}`;
+        ctx.fillStyle = getColor('burn');
+        ctx.textBaseline = 'top';
+        ctx.fillText(formatDeltaV(preview.deltaVMagnitude), nodeScreen.x + 16, nodeScreen.y + 16);
+        ctx.restore();
+
+        drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'), null);
+        drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'), nodeScreen);
+        drawApsisLabel(plannedApsides.apoapsis.screen, plannedApsides.apoapsis.altitude, getColor('burn'), nodeScreen);
+        drawApsisLabel(plannedApsides.periapsis.screen, plannedApsides.periapsis.altitude, getColor('burn'), nodeScreen);
+
+        const handles = handleScreenPositions();
+        if (handles) {
+          drawHandle(handles.prograde, node.progradeDeltaV >= 0 ? 'MAP_MANEUVER_PROGRADE' : 'MAP_MANEUVER_RETROGRADE');
+          drawHandle(handles.radial, node.radialDeltaV >= 0 ? 'MAP_MANEUVER_RADIAL_OUT' : 'MAP_MANEUVER_RADIAL_IN');
+        }
+
+        drawPredictedTransfer(vessel, preview.resultOrbit, preview.nodeTime);
+      } else {
+        drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'), null);
+        drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'), null);
       }
     }
 

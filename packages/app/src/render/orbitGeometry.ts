@@ -3,16 +3,13 @@
  *
  * Deliberately narrow: this module only knows the *shape* of an ellipse
  * (`a`, `e`, `argPe`) — it never converts a state vector to/from an orbit
- * (that is `@karman/core`'s `orbitFromState`/`stateFromOrbit`, Agent A's job,
- * not implemented yet) and never advances anomaly with time (that needs
- * Kepler's equation, also Agent A's `eccentricAnomaly`). Apoapsis/periapsis
- * radius *are* included here even though `@karman/core` will eventually
- * export `apoapsis`/`periapsis` too — they're a fixed two-term formula
- * (`a·(1±e)`), not a solver, so there's nothing to "get wrong" by having a
- * local copy for rendering, and it lets the map draw markers before Agent A's
- * branch lands. Everything genuinely hard (state↔orbit, time↔anomaly) is
- * left for the orchestrator to wire to the real core once available — see
- * `scenes/map/fixtures/localOrbitMath.ts` for where that seam is isolated.
+ * (that is `@karman/core`'s `orbitFromState`/`stateFromOrbit`) and never
+ * advances anomaly with time (that needs Kepler's equation,
+ * `eccentricAnomaly`) — see `scenes/map/maneuverNode.ts`'s `OrbitKernel` for
+ * where that math actually lives. Apoapsis/periapsis radius *are* included
+ * here even though `@karman/core` also exports `apoapsis`/`periapsis` —
+ * they're a fixed two-term formula (`a·(1±e)`), not a solver, so a local copy
+ * for rendering carries no risk of drifting from the real one.
  */
 import type { Vec2 } from '@karman/core';
 

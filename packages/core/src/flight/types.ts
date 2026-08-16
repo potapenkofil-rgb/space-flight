@@ -27,6 +27,17 @@ export interface ControlInput {
   /** Stability-assist system enabled: holds current heading via a PD controller (PLAN.md §5.5). */
   readonly sas: boolean;
   /**
+   * **Contract extension (Agent B):** heading, rad, that SAS should hold while
+   * `sas` is `true`. PLAN.md §5.5 says SAS is "a PD controller on heading
+   * error" but the frozen `ControlInput` fields (per §4) give no target angle
+   * to hold, and no such setpoint is stored on `Vessel` either — without one
+   * the PD error is always zero. Optional and additive: the caller (e.g. the
+   * flight scene, capturing `v.rotation` the tick SAS is toggled on) may set
+   * it; when omitted `stepFlight` falls back to damping `angularVelocity`
+   * toward zero (kills tumbling without a heading lock). See report.
+   */
+  readonly sasTargetHeading?: number;
+  /**
    * `true` on exactly the tick a stage separation was requested, `false`
    * otherwise. Edge-triggered, not level-triggered — the integrator must not
    * re-fire the stage every tick this stays `true`.

@@ -7,19 +7,35 @@
  */
 import type { Vec2 } from '../math/vec2';
 import type { Body, Orbit } from '../orbits/types';
-import type { NodeKind } from './parts';
+import type { NodeKind, PartDef } from './parts';
 
 /**
  * One placed part aboard a vessel: a mutable instance of a `PartDef`.
  * `position`/`rotation` are in the vessel's local frame (metres/radians,
  * relative to the vessel's own origin — NOT world space; world placement comes
  * from `Vessel.position`/`Vessel.rotation`).
+ *
+ * **Contract extension (Agent B):** PLAN.md §4 pins `computeMass`,
+ * `consumeFuel`, `evaluateStructure`, `computeDeltaV` and `stepFlight` to take
+ * only a `Vessel` (no `PartLibrary`), yet every one of them needs each part's
+ * `dryMass`, `resources` capacities, `engine`, `nodeStrength`, `dragArea`,
+ * `bounds` and `crossfeed` — data that lives on `PartDef`, reachable only via
+ * `partId` through a `PartLibrary` lookup. `PartInstance`/`PartDef` are not
+ * among the frozen §4 signatures (only named as "simple structures agent 0
+ * declares", same bucket as `ControlInput`/`FlightEnvironment`/`Loads`), so
+ * this adds `def` — the already-resolved `PartDef` for this instance — so the
+ * vessel systems never need a library reference. Whoever builds a
+ * `PartInstance` (hangar, save loader) is expected to set `def` from the
+ * `PartLibrary` at construction time; `partId` is kept for
+ * serialization/display. See report for details.
  */
 export interface PartInstance {
   /** Instance id, unique within this vessel (stable across ticks; reused nowhere else). */
   readonly id: number;
   /** `PartDef.id` this instance was created from. */
   readonly partId: string;
+  /** The resolved definition `partId` refers to. See the contract-extension note above. */
+  readonly def: PartDef;
   /** Position in the vessel's local frame, m. */
   position: Vec2;
   /** Orientation in the vessel's local frame, rad. */

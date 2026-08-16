@@ -30,7 +30,7 @@ function padRocket() {
 
 describe('a vessel resting on the pad', () => {
   it('stays aligned with the local vertical for 10 s of idle simulation', () => {
-    const { vessel, terra } = padRocket();
+    const { vessel } = padRocket();
     let sim = INITIAL_FLIGHT_SIM_STATE;
 
     for (let tick = 0; tick < 600; tick += 1) {

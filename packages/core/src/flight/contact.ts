@@ -5,18 +5,31 @@
  * **Contract note (Agent B):** `PartDef` (§4) has no explicit "contact point" /
  * "foot" geometry field — only `bounds` (footprint) and `maxLandingSpeed`
  * (meaningful only on legs). Contact points here are derived generally, for
- * *every* part, as the two bottom corners of its local AABB — per DESIGN.md
- * §4 a part's local origin `(0,0)` is its bottom node, so `y = 0` is already
- * "the bottom" of the part in its own local frame. This self-selects: a tall
- * body's own bottom corners sit far above the ground once legs are attached
- * beneath it (no penetration, no force), while the legs' corners — spread out
- * by their own `bounds.w` and wherever they were placed — are what actually
- * touches down. No per-category special-casing needed. See report.
+ * *every* part, as the two lowest corners of its local (rotated) AABB — per
+ * DESIGN.md §4 a part's local origin `(0,0)` is its bottom node and `+Y`
+ * points toward the nose, so *unrotated* `y = 0` is "the bottom". But
+ * `PartInstance.rotation` is **not** always `0`: the hangar's attach solver
+ * (`bestOwnNode`/`computeAttachTransform` in `scenes/build/state.ts`) is free
+ * to rotate a part 180° to make its node directions mate — every part in a
+ * vessel assembled root-down-to-nose-first-then-extended-*downward* (as
+ * opposed to the usual bottom-up order) ends up rotated by π. A part rotated
+ * by π has its true bottom at local `y = -bounds.h`, not `y = 0` — using the
+ * unrotated corner unconditionally (the previous version of this function)
+ * silently picks the *wrong* corner pair for such a part: its now-highest
+ * edge instead of its lowest. That misidentified "bottom" edge sits well
+ * inside another part's span, so it reads as a deep, sourceless
+ * ground-penetration the very first tick — the actual mechanism behind the
+ * pad-toppling bug this file's report investigates, not a tuning problem.
+ * Rotating the full corner set with the part's actual `rotation` and taking
+ * the two lowest by local `y` fixes this for any rotation, not just 0/π, and
+ * still self-selects exactly as before: a part whose true lowest edge sits
+ * above the vessel's actual base never penetrates, so it contributes no
+ * force. See report.
  */
 import { clamp, degToRad, safeAcos } from '../math/mathx';
 import { v2, ZERO, type Vec2 } from '../math/vec2';
 import type { Body } from '../orbits/types';
-import type { Vessel } from '../vessels/vessel';
+import type { PartInstance, Vessel } from '../vessels/vessel';
 
 /** One candidate ground-contact point, in the vessel's local frame. */
 export interface ContactPoint {
@@ -42,17 +55,64 @@ const FRICTION_COEFF = 0.6;
 const POSITION_CORRECTION_FRACTION = 0.2;
 const PENETRATION_EPSILON = 1e-5;
 
-/** Every part's two local bottom-AABB corners, sorted by `partId` ascending. */
+/**
+ * All four corners of a part's local AABB (`bounds.w × bounds.h`, spanning
+ * local `y ∈ [0, bounds.h]` per DESIGN.md §4's "origin is the bottom node"
+ * convention), rotated by the part's own `rotation` and translated by its
+ * `position` — i.e. in the *vessel's* local frame, not the part's.
+ */
+function partCornersInVesselFrame(part: PartInstance): Vec2[] {
+  const halfW = part.def.bounds.w / 2;
+  const h = part.def.bounds.h;
+  const local: Vec2[] = [
+    { x: -halfW, y: 0 },
+    { x: halfW, y: 0 },
+    { x: -halfW, y: h },
+    { x: halfW, y: h },
+  ];
+  return local.map((c) => v2.add(part.position, v2.rot(c, part.rotation)));
+}
+
+/**
+ * A part's two lowest corners (by vessel-local `y`, ascending) — its true
+ * bottom edge regardless of how the part ended up rotated. For the common
+ * axis-aligned case (`rotation` a multiple of π) this is exactly the pair of
+ * corners on the low side of the box; for an off-axis rotation (e.g. a
+ * radially-mounted leg) it's the two corners closest to the ground, still a
+ * reasonable two-point stance. See the module doc for why this must not
+ * assume unrotated local `y = 0` is always "the bottom".
+ */
+function partBottomCorners(part: PartInstance): ContactPoint[] {
+  const corners = [...partCornersInVesselFrame(part)].sort((a, b) => a.y - b.y);
+  return corners.slice(0, 2).map((localPos) => ({ partId: part.id, localPos }));
+}
+
+/** Every part's two lowest local corners, sorted by `partId` ascending. */
 export function computeContactPoints(v: Vessel): ContactPoint[] {
   const points: ContactPoint[] = [];
   for (const part of [...v.parts].sort((a, b) => a.id - b.id)) {
-    const halfW = part.def.bounds.w / 2;
-    const left = v2.add(part.position, v2.rot({ x: -halfW, y: 0 }, part.rotation));
-    const right = v2.add(part.position, v2.rot({ x: halfW, y: 0 }, part.rotation));
-    points.push({ partId: part.id, localPos: left });
-    points.push({ partId: part.id, localPos: right });
+    points.push(...partBottomCorners(part));
   }
   return points;
+}
+
+/**
+ * Inertial-frame velocity of the ground itself at `worldPoint` (which, per
+ * `Vessel.position`'s contract, is already relative to `body`'s own centre)
+ * for a body spinning once every `body.rotationPeriod` seconds: `v = ω × r`.
+ * The same formula `launchVessel`/`FlightEnvironment.atmosphereVelocity` use
+ * for "the pad" / "the air" — the ground is no different, and skipping this
+ * is the second half of the pad-toppling bug this file's report covers: a
+ * vessel resting on a rotating body (Terra: ~291 m/s at the equator) is
+ * launched *at* that speed (`launchVessel`'s `padVelocity`), so its contact
+ * points are never actually "sliding" — but comparing their raw inertial
+ * velocity against zero, as this function's callers used to, makes the
+ * friction model see ~291 m/s of phantom slip and fight it at full clamped
+ * force, forever, which torques the vessel over within a couple of seconds.
+ */
+function groundVelocity(worldPoint: Vec2, body: Body): Vec2 {
+  const omega = body.rotationPeriod > 0 ? (2 * Math.PI) / body.rotationPeriod : 0;
+  return { x: -omega * worldPoint.y, y: omega * worldPoint.x };
 }
 
 interface ActiveContact {
@@ -60,6 +120,8 @@ interface ActiveContact {
   readonly depth: number;
   /** Offset from the vessel's world centre of mass to this point, m. */
   readonly r: Vec2;
+  /** Inertial-frame velocity of the ground at this point, m/s (see {@link groundVelocity}). */
+  readonly groundVel: Vec2;
 }
 
 function findActiveContacts(v: Vessel, body: Body): ActiveContact[] {
@@ -71,7 +133,7 @@ function findActiveContacts(v: Vessel, body: Body): ActiveContact[] {
     const depth = body.radius - dist;
     if (depth > 0) {
       const normal = dist > 0 ? v2.scale(world, 1 / dist) : { x: 0, y: 1 };
-      active.push({ normal, depth, r: v2.sub(world, comWorld) });
+      active.push({ normal, depth, r: v2.sub(world, comWorld), groundVel: groundVelocity(world, body) });
     }
   }
   return active;
@@ -106,11 +168,16 @@ export function resolveContact(v: Vessel, body: Body): ContactResult {
     maxPenetration = Math.max(maxPenetration, point.depth);
     const rot90 = { x: -point.r.y, y: point.r.x };
     const pointVel = v2.add(v.velocity, v2.scale(rot90, v.angularVelocity));
-    const vn = v2.dot(pointVel, point.normal); // negative = still approaching the surface
+    // Relative to the ground *at this point*, not the inertial frame (see
+    // `groundVelocity`'s doc) — ω×r is purely tangential (⊥ the radial
+    // normal), so this only ever changes `vt`, never `vn`, but computing both
+    // from the same relative velocity keeps the two consistent.
+    const relVel = v2.sub(pointVel, point.groundVel);
+    const vn = v2.dot(relVel, point.normal); // negative = still approaching the surface
     const fn = Math.max(0, k * point.depth - c * vn);
 
     const tangent = { x: -point.normal.y, y: point.normal.x };
-    const vt = v2.dot(pointVel, tangent);
+    const vt = v2.dot(relVel, tangent);
     const maxFriction = FRICTION_COEFF * fn;
     // Clamp friction to what would exactly zero the tangential velocity this
     // instant (using the effective per-point mass) — prevents overshoot/jitter.

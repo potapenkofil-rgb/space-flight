@@ -14,9 +14,11 @@
  */
 import { getLocale, onLocaleChange, t } from '../../i18n';
 import {
+  apoapsis,
   createTrajectoryPredictor,
   formatDeltaV,
   formatDistance,
+  periapsis,
   setUnitsLocale,
   v2,
   type ConicSegment,
@@ -64,8 +66,32 @@ const HIT_TEST_SAMPLE_COUNT = 360;
 const PREDICT_HORIZON_SECONDS = 40 * 24 * 3600;
 const PREDICT_MAX_SEGMENTS = 6;
 const SOI_TRANSITION_MARKER_RADIUS_PX = 4;
+/** Below this altitude (m), a vessel counts as "on the ground" rather than merely "suborbital" — see `classifyOrbit`. */
+const GROUND_ALTITUDE_THRESHOLD_M = 50;
 
 type DragMode = 'prograde' | 'radial' | null;
+
+/**
+ * Whether an orbit is safe to draw and label as an orbit at all (PLAN.md §8
+ * step 5 / orchestrator fix): a vessel resting on the pad, or coasting on a
+ * trajectory that already dips into the body, has a mathematically valid
+ * `Orbit` — `orbitFromState` never fails — but its periapsis is at or below
+ * the surface, which reads as nonsense on screen (a negative-altitude
+ * periapsis number, an ellipse whose near side is inside the planet). Ellipse
+ * + numbers only get drawn for `'stable'`; `'grounded'`/`'suborbital'` get a
+ * plain status label instead (see `render()`/`syncPanels()`).
+ */
+export type OrbitState = 'stable' | 'grounded' | 'suborbital';
+
+export function classifyOrbit(orbit: Orbit, bodyRadius: number, currentAltitudeM: number): OrbitState {
+  if (periapsis(orbit) > bodyRadius) return 'stable';
+  return currentAltitudeM < GROUND_ALTITUDE_THRESHOLD_M ? 'grounded' : 'suborbital';
+}
+
+const ORBIT_STATE_KEY: Readonly<Record<Exclude<OrbitState, 'stable'>, string>> = {
+  grounded: 'MAP_STATE_GROUNDED',
+  suborbital: 'MAP_STATE_SUBORBITAL',
+};
 
 export type MapNavigate = (scene: 'menu' | 'flight') => void;
 
@@ -321,9 +347,17 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
     deltaVRow.value.textContent = formatDeltaV(preview.deltaVMagnitude);
     resultRow.label.textContent = t('MAP_MANEUVER_RESULT');
     const bodyRadius = bodyById(vessel.bodyId).body.radius;
-    const apo = preview.resultOrbit.a * (1 + preview.resultOrbit.e) - bodyRadius;
-    const peri = preview.resultOrbit.a * (1 - preview.resultOrbit.e) - bodyRadius;
-    resultRow.value.textContent = `${formatDistance(peri)} / ${formatDistance(apo)}`;
+    const burnAltitude = v2.len(preview.worldPos) - bodyRadius;
+    const plannedState = classifyOrbit(preview.resultOrbit, bodyRadius, burnAltitude);
+    if (plannedState === 'stable') {
+      const apo = apoapsis(preview.resultOrbit) - bodyRadius;
+      const peri = periapsis(preview.resultOrbit) - bodyRadius;
+      resultRow.value.textContent = `${formatDistance(peri)} / ${formatDistance(apo)}`;
+    } else {
+      // A negative-altitude periapsis number is meaningless to the player
+      // (PLAN.md §8 fix) — state instead of a bogus pair of distances.
+      resultRow.value.textContent = t(ORBIT_STATE_KEY[plannedState]);
+    }
   }
   syncPanels();
 
@@ -466,6 +500,17 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
     ctx.restore();
   }
 
+  /** Plain-text status in place of an ellipse + apsis numbers for a degenerate (grounded/suborbital) orbit — see `classifyOrbit`. */
+  function drawOrbitStateLabel(screen: Vec2, labelKey: string, color: string): void {
+    ctx.save();
+    ctx.font = `${getFontSizePx(1)}px ${getFont('data')}`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    ctx.fillText(t(labelKey), screen.x, screen.y - 10);
+    ctx.restore();
+  }
+
   function drawHandle(screen: Vec2, labelKey: string): void {
     ctx.save();
     ctx.fillStyle = getColor('burn');
@@ -532,12 +577,21 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
       const body = bodyView.body;
       const bodyPosition = body.positionAt(nowTime);
 
-      drawOrbitPath(ctx, camera, bodyPosition, vessel.orbit, 'current', widthPx, heightPx);
-      const currentApsides = drawApsisMarkers(ctx, camera, bodyPosition, vessel.orbit, body.radius, 'current', widthPx, heightPx);
-
-      // Current vessel position marker ("you are here").
+      // Current vessel position marker ("you are here") — computed before
+      // deciding whether the orbit itself is worth drawing as an ellipse.
       const nowState = REAL_ORBIT_KERNEL.stateFromOrbit(vessel.orbit, nowTime);
       const nowScreen = worldToScreen(camera, v2.add(bodyPosition, nowState.r), widthPx, heightPx);
+      const currentAltitude = v2.len(nowState.r) - body.radius;
+      const currentState = classifyOrbit(vessel.orbit, body.radius, currentAltitude);
+
+      let currentApsides: ReturnType<typeof drawApsisMarkers> | null = null;
+      if (currentState === 'stable') {
+        drawOrbitPath(ctx, camera, bodyPosition, vessel.orbit, 'current', widthPx, heightPx);
+        currentApsides = drawApsisMarkers(ctx, camera, bodyPosition, vessel.orbit, body.radius, 'current', widthPx, heightPx);
+      } else {
+        drawOrbitStateLabel(nowScreen, ORBIT_STATE_KEY[currentState], getColor('orbit'));
+      }
+
       ctx.save();
       ctx.fillStyle = getColor('ink');
       ctx.beginPath();
@@ -547,11 +601,19 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
 
       if (node) {
         const preview = previewManeuver(vessel.orbit, node, nowTime, REAL_ORBIT_KERNEL);
-        drawOrbitPath(ctx, camera, bodyPosition, preview.resultOrbit, 'planned', widthPx, heightPx);
-        const plannedApsides = drawApsisMarkers(ctx, camera, bodyPosition, preview.resultOrbit, body.radius, 'planned', widthPx, heightPx);
-
         const nodeWorld = v2.add(bodyPosition, preview.worldPos);
         const nodeScreen = drawManeuverNodeMarker(ctx, camera, nodeWorld, widthPx, heightPx);
+        const burnAltitude = v2.len(preview.worldPos) - body.radius;
+        const plannedState = classifyOrbit(preview.resultOrbit, body.radius, burnAltitude);
+
+        let plannedApsides: ReturnType<typeof drawApsisMarkers> | null = null;
+        if (plannedState === 'stable') {
+          drawOrbitPath(ctx, camera, bodyPosition, preview.resultOrbit, 'planned', widthPx, heightPx);
+          plannedApsides = drawApsisMarkers(ctx, camera, bodyPosition, preview.resultOrbit, body.radius, 'planned', widthPx, heightPx);
+        } else {
+          drawOrbitStateLabel(nodeScreen, ORBIT_STATE_KEY[plannedState], getColor('burn'));
+        }
+
         // DESIGN.md §5: a mono ΔV readout right next to the node glyph itself.
         ctx.save();
         ctx.font = `${getFontSizePx(0)}px ${getFont('data')}`;
@@ -560,10 +622,14 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
         ctx.fillText(formatDeltaV(preview.deltaVMagnitude), nodeScreen.x + 16, nodeScreen.y + 16);
         ctx.restore();
 
-        drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'), null);
-        drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'), nodeScreen);
-        drawApsisLabel(plannedApsides.apoapsis.screen, plannedApsides.apoapsis.altitude, getColor('burn'), nodeScreen);
-        drawApsisLabel(plannedApsides.periapsis.screen, plannedApsides.periapsis.altitude, getColor('burn'), nodeScreen);
+        if (currentApsides) {
+          drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'), null);
+          drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'), nodeScreen);
+        }
+        if (plannedApsides) {
+          drawApsisLabel(plannedApsides.apoapsis.screen, plannedApsides.apoapsis.altitude, getColor('burn'), nodeScreen);
+          drawApsisLabel(plannedApsides.periapsis.screen, plannedApsides.periapsis.altitude, getColor('burn'), nodeScreen);
+        }
 
         const handles = handleScreenPositions();
         if (handles) {
@@ -572,7 +638,7 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
         }
 
         drawPredictedTransfer(vessel, preview.resultOrbit, preview.nodeTime);
-      } else {
+      } else if (currentApsides) {
         drawApsisLabel(currentApsides.apoapsis.screen, currentApsides.apoapsis.altitude, getColor('orbit'), null);
         drawApsisLabel(currentApsides.periapsis.screen, currentApsides.periapsis.altitude, getColor('orbit'), null);
       }

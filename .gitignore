@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.pnpm-store/
+*.tsbuildinfo
+
+# build artifacts
+packages/*/dist/
+src-tauri/target/
+
+# tests
+test-results/
+playwright-report/
+tests/e2e/screenshots/*.png
+!tests/e2e/screenshots/.gitkeep
+
+# editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

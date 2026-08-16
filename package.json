@@ -1,0 +1,29 @@
+{
+  "name": "karman",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Karman — 2D spaceflight simulator (Windows 10, Tauri)",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm --filter @karman/core run build && pnpm --filter @karman/app run build",
+    "e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "typecheck": "pnpm -r --if-present run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.5.0",
+    "eslint": "^9.9.0",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.3.0"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

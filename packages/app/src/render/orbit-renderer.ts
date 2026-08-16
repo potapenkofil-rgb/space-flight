@@ -190,10 +190,7 @@ export function drawManeuverNodeMarker(
 /**
  * Draws a body on the map: radial gradient disc plus a thin atmosphere ring
  * (DESIGN.md §5: "radial gradient sky-hi → sky-lo, thin atmosphere ring in
- * `Orbit` at 55%"). DESIGN.md references `sky-hi`/`sky-lo` tokens that
- * are not present in `ui/tokens.css`'s §1 palette table — this approximates
- * the intent with the closest existing role pair (`orbitSoft` → `ground`)
- * until those tokens are added; see the Agent D report for the flagged gap.
+ * `Orbit` at 55%").
  */
 export function drawMapBody(
   ctx: CanvasRenderingContext2D,
@@ -209,8 +206,8 @@ export function drawMapBody(
 
   ctx.save();
   const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radiusPx);
-  gradient.addColorStop(0, getColor('orbitSoft'));
-  gradient.addColorStop(1, getColor('ground'));
+  gradient.addColorStop(0, getColor('skyHi'));
+  gradient.addColorStop(1, getColor('skyLo'));
   ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(p.x, p.y, radiusPx, 0, Math.PI * 2);

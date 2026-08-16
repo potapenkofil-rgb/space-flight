@@ -45,7 +45,11 @@ export function drawDemoScene(
   const center = worldToScreen(camera, { x: 0, y: 0 }, viewportWidthPx, viewportHeightPx);
   const radiusPx = TERRA_RADIUS_M * camera.pixelsPerMeter;
 
-  ctx.fillStyle = getColor('orbitSoft');
+  // DESIGN.md §5: radial gradient sky-hi → sky-lo, same treatment as the map/flight planet discs.
+  const gradient = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, Math.max(radiusPx, 1));
+  gradient.addColorStop(0, getColor('skyHi'));
+  gradient.addColorStop(1, getColor('skyLo'));
+  ctx.fillStyle = gradient;
   ctx.beginPath();
   ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
   ctx.fill();

@@ -27,6 +27,10 @@
   --color-nominal: #5fcb8b;
   --color-warning: #f2c14e;
   --color-critical: #ff5a5a;
+
+  /* Planet gradient (DESIGN.md §5: "radial gradient sky-hi → sky-lo") — missing from the original palette table, added here per the orchestrator report. */
+  --color-sky-hi: #16304d;
+  --color-sky-lo: #0a1626;
 }
 
 :root[data-theme='light'] {
@@ -45,6 +49,9 @@
   --color-nominal: #2e7d52;
   --color-warning: #9a7407;
   --color-critical: #b32424;
+
+  --color-sky-hi: #bfd4e6;
+  --color-sky-lo: #8fafc9;
 }
 
 :root {

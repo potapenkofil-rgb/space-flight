@@ -22,7 +22,9 @@ export type ColorRole =
   | 'orbitSoft'
   | 'nominal'
   | 'warning'
-  | 'critical';
+  | 'critical'
+  | 'skyHi'
+  | 'skyLo';
 
 export type FontRole = 'display' | 'body' | 'data';
 
@@ -45,6 +47,8 @@ const COLOR_VAR: Record<ColorRole, string> = {
   nominal: '--color-nominal',
   warning: '--color-warning',
   critical: '--color-critical',
+  skyHi: '--color-sky-hi',
+  skyLo: '--color-sky-lo',
 };
 
 const FONT_VAR: Record<FontRole, string> = {

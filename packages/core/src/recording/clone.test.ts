@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cloneVessel } from './clone';
-import { createFakeVessel } from './testFixtures';
+import { createFakeVessel, createFakePart } from './testFixtures';
 
 describe('cloneVessel', () => {
   it('produces an independent copy of mutable substructures', () => {
@@ -9,7 +9,7 @@ describe('cloneVessel', () => {
 
     // Mutate the original's part resources in place, as consumeFuel does.
     original.parts[0]!.resources['fuel'] = 0;
-    original.parts.push({ id: 999, partId: 'x', position: { x: 0, y: 0 }, rotation: 0, resources: {} });
+    original.parts.push(createFakePart({ id: 999, partId: 'x', resources: {} }));
     original.joints.push({ id: 1, a: 1, b: 2, nodeKind: 'stack', strength: 1 });
 
     expect(clone.parts[0]!.resources['fuel']).toBe(1000);

@@ -8,6 +8,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/build/**',
       '**/node_modules/**',
+      // temporary agent worktrees: separate checkouts of this repo, linted on their own
+      '.claude/**',
       '**/playwright-report/**',
       '**/test-results/**',
       'src-tauri/target/**',

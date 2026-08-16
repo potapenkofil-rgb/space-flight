@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReplaySession } from './types';
 import { computeTelemetrySeries } from './telemetry';
-import { createFakeBody, createFakeVessel } from './testFixtures';
+import { createFakeBody, createFakePart, createFakeVessel } from './testFixtures';
 
 const BODY = createFakeBody({ radius: 1_000_000 });
 
@@ -54,13 +54,11 @@ describe('computeTelemetrySeries', () => {
       createFakeVessel(1, {
         soi: BODY,
         parts: [
-          {
+          createFakePart({
             id: 1,
             partId: 'tank',
-            position: { x: 0, y: 0 },
-            rotation: 0,
             resources: { fuel: Math.max(0, 1000 - 200 * t) },
-          },
+          }),
         ],
       })
     );

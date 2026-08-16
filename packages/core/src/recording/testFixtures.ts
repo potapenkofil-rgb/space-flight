@@ -18,6 +18,7 @@
  */
 import { v2, type Vec2 } from '../math/vec2';
 import type { Body, Orbit } from '../orbits/types';
+import { makePartDef } from '../vessels/testFixtures';
 import type { ControlInput } from '../flight/types';
 import type { PartInstance, Vessel } from '../vessels/vessel';
 import type { WorldStepFn } from './engine';
@@ -46,6 +47,7 @@ export function createFakePart(overrides: Partial<PartInstance> = {}): PartInsta
   return {
     id: nextPartId++,
     partId: 'fake_tank',
+    def: makePartDef({ id: 'fake_tank', resources: [{ id: 'fuel', capacity: 1000 }] }),
     position: { x: 0, y: 0 },
     rotation: 0,
     resources: { fuel: 1000 },

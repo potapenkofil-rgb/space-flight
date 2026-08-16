@@ -14,6 +14,8 @@ function clonePartInstance(part: PartInstance): PartInstance {
   return {
     id: part.id,
     partId: part.partId,
+    // `def` is immutable library content, shared by reference like `soi` below.
+    def: part.def,
     position: part.position,
     rotation: part.rotation,
     resources: { ...part.resources },

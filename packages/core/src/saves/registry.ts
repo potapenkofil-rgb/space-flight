@@ -6,7 +6,8 @@
  * whole reason this is cheap under high time warp: it's `O(vessels)` calls to
  * a closed-form Kepler solve, independent of how large `t` jumps.
  */
-import { stateFromOrbit, type Orbit } from '../orbits/types';
+import { stateFromOrbit } from '../orbits/kepler';
+import type { Orbit } from '../orbits/types';
 import type { Vec2 } from '../math/vec2';
 import type { Vessel } from '../vessels/vessel';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Body, ReplayMarker, ReplaySession, Vessel } from '@karman/core';
+import type { Body, PartDef, ReplayMarker, ReplaySession, Vessel } from '@karman/core';
 import { mountReplayPanel } from './replayPanel';
 
 const BODY: Body = {
@@ -15,10 +15,28 @@ const BODY: Body = {
   velocityAt: () => ({ x: 0, y: 0 }),
 };
 
+/** Minimal `PartDef` for the panel's charts — only `resources` is read here. */
+const FAKE_TANK: PartDef = {
+  id: 'fake_tank',
+  name: { en: 'Fake Tank', ru: 'Fake Tank' },
+  description: { en: '', ru: '' },
+  category: 'tanks',
+  dryMass: 300,
+  resources: [{ id: 'fuel', capacity: 500 }],
+  engine: null,
+  dragArea: 1,
+  nodeStrength: 1e6,
+  maxLandingSpeed: 0,
+  crossfeed: true,
+  nodes: [],
+  bounds: { w: 1, h: 1 },
+  art: { viewBox: { w: 64, h: 64 }, svg: '<svg viewBox="0 0 64 64"></svg>' },
+};
+
 function fakeVessel(id: number, altitudeAboveRadius = 100_000): Vessel {
   return {
     id,
-    parts: [{ id: 1, partId: 'fake_tank', position: { x: 0, y: 0 }, rotation: 0, resources: { fuel: 500 } }],
+    parts: [{ id: 1, partId: 'fake_tank', def: FAKE_TANK, position: { x: 0, y: 0 }, rotation: 0, resources: { fuel: 500 } }],
     joints: [],
     stages: [{ index: 0, partIds: [1] }],
     currentStage: 0,

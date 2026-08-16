@@ -5,10 +5,20 @@
  */
 import './ui/tokens.css';
 import { mountMenuScene } from './scenes/menu/MenuScene';
+// TEMPORARY integration seam, added by Agent C outside its file zone
+// (packages/app/src/scenes/build/**, packages/app/src/ui/build/**) so the
+// hangar scene it built is actually reachable and testable end-to-end before
+// the integrator (PLAN.md §7, stage 2: "assembly and polish") wires the real
+// scene router / menu "Hangar" button.
+// `?scene=build` mounts the hangar full-screen instead of the menu; nothing
+// else in this file changes. ORCHESTRATOR: replace with the real router and
+// delete this import + the branch below once menu → hangar navigation lands.
+import { mountBuildScene } from './scenes/build/BuildScene';
 import { createGameLoop } from './engine/gameLoop';
 import { createCamera, rebaseCamera, zoomCamera, type Camera } from './render/camera';
 import { drawDemoScene } from './render/demoScene';
 import { createStarfield } from './render/starfield';
+import { getInitialTheme } from './ui/tokens';
 
 const MIN_PIXELS_PER_METER = 1e-7;
 const MAX_PIXELS_PER_METER = 2;
@@ -97,7 +107,17 @@ function main(): void {
   }
   requestAnimationFrame(frame);
 
-  mountMenuScene(getAppRoot());
+  // `mountMenuScene` normally applies the persisted theme choice on first
+  // load; the temporary `?scene=build` branch above bypasses it, so apply it
+  // unconditionally here too (harmless — `mountMenuScene` re-applies the same
+  // value on its own path).
+  document.documentElement.dataset['theme'] = getInitialTheme();
+
+  if (new URLSearchParams(window.location.search).get('scene') === 'build') {
+    mountBuildScene(getAppRoot());
+  } else {
+    mountMenuScene(getAppRoot());
+  }
 }
 
 main();

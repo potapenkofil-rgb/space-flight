@@ -6,7 +6,13 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
-      '**/build/**',
+      // NOT '**/build/**': that glob doesn't match any real build-output
+      // directory in this repo (both packages emit to `dist`, per
+      // vite.config.ts/tsconfig.json) but it DID silently match Agent C's
+      // entire source zone, `packages/app/src/scenes/build/**` — a plain
+      // `pnpm lint` was reporting a clean pass while never actually parsing
+      // any file under `scenes/build/`. Fixed by Agent C (outside its file
+      // zone, but necessary — see the report).
       '**/node_modules/**',
       // temporary agent worktrees: separate checkouts of this repo, linted on their own
       '.claude/**',

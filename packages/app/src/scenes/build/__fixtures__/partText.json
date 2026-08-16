@@ -1,0 +1,46 @@
+{
+  "pod_capsule": {
+    "name": { "en": "Command Pod", "ru": "Командный отсек" },
+    "description": { "en": "Crew capsule with reaction control.", "ru": "Кабина экипажа с блоком РСУ." }
+  },
+  "tank_s1": {
+    "name": { "en": "Fuel Tank S", "ru": "Бак малый" },
+    "description": { "en": "Small liquid-fuel tank.", "ru": "Малый бак жидкого топлива." }
+  },
+  "tank_m1": {
+    "name": { "en": "Fuel Tank M", "ru": "Бак средний" },
+    "description": { "en": "Medium liquid-fuel tank.", "ru": "Средний бак жидкого топлива." }
+  },
+  "engine_start": {
+    "name": { "en": "Booster Engine", "ru": "Стартовый двигатель" },
+    "description": { "en": "Sea-level optimized liquid engine.", "ru": "Жидкостный двигатель для старта." }
+  },
+  "engine_vac": {
+    "name": { "en": "Vacuum Engine", "ru": "Вакуумный двигатель" },
+    "description": { "en": "High-Isp upper-stage engine.", "ru": "Двигатель верхней ступени с высоким Isp." }
+  },
+  "srb_booster": {
+    "name": { "en": "Solid Booster", "ru": "Твердотопливный ускоритель" },
+    "description": { "en": "Radially mounted solid rocket booster.", "ru": "Радиальный твердотопливный ускоритель." }
+  },
+  "decoupler_stack": {
+    "name": { "en": "Stack Separator", "ru": "Разделитель стековый" },
+    "description": { "en": "Splits the stack in two on staging.", "ru": "Разделяет стек на две части при отделении." }
+  },
+  "legs_light": {
+    "name": { "en": "Landing Legs", "ru": "Опоры лёгкие" },
+    "description": { "en": "Fixed landing legs.", "ru": "Фиксированные посадочные опоры." }
+  },
+  "parachute": {
+    "name": { "en": "Parachute", "ru": "Парашют" },
+    "description": { "en": "Slows descent in atmosphere.", "ru": "Замедляет спуск в атмосфере." }
+  },
+  "battery": {
+    "name": { "en": "Battery", "ru": "Батарея" },
+    "description": { "en": "Stores electricity.", "ru": "Хранит электроэнергию." }
+  },
+  "solar_panel": {
+    "name": { "en": "Solar Panel", "ru": "Солнечная панель" },
+    "description": { "en": "Generates electricity in sunlight.", "ru": "Вырабатывает электроэнергию на свету." }
+  }
+}

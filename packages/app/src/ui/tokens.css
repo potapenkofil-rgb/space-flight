@@ -1,0 +1,130 @@
+/**
+ * Kármán design tokens — source of truth for color, type and the base size
+ * scale. See docs/DESIGN.md §1/§2. `ui/tokens.ts` reads these via
+ * getComputedStyle() so canvas rendering and DOM styling never diverge.
+ *
+ * Theme: dark is the default (DESIGN.md §1: theme is switchable in settings,
+ * dark by default). `main.ts` sets `data-theme="dark"|"light"` on
+ * <html> explicitly on first load and whenever the user switches it, so the
+ * page never depends on the OS color-scheme preference.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  /* -- Palette (DESIGN.md §1) -- */
+  --color-ground: #070a11;
+  --color-panel: #0d131e;
+  --color-panel-alt: #121a28;
+  --color-hairline: #22304a;
+  --color-hairline-soft: #182337;
+  --color-ink: #dee6f1;
+  --color-ink-muted: #a3b0c4;
+  --color-muted: #6d7c93;
+  --color-burn: #ff7a2f;
+  --color-burn-soft: #5a2e12;
+  --color-orbit: #8fb4d9;
+  --color-orbit-soft: #26405e;
+  --color-nominal: #5fcb8b;
+  --color-warning: #f2c14e;
+  --color-critical: #ff5a5a;
+}
+
+:root[data-theme='light'] {
+  --color-ground: #e9e5dc;
+  --color-panel: #f5f2eb;
+  --color-panel-alt: #dfdace;
+  --color-hairline: #c4bcaa;
+  --color-hairline-soft: #d8d2c4;
+  --color-ink: #181d24;
+  --color-ink-muted: #4a5260;
+  --color-muted: #7c8291;
+  --color-burn: #c6491a;
+  --color-burn-soft: #e8b79e;
+  --color-orbit: #2f5f92;
+  --color-orbit-soft: #a9c2da;
+  --color-nominal: #2e7d52;
+  --color-warning: #9a7407;
+  --color-critical: #b32424;
+}
+
+:root {
+  /* -- Fonts (DESIGN.md §2) — every family is already on Windows 10; fallbacks are for dev/CI on Linux/Mac. -- */
+  --font-display: 'Bahnschrift SemiCondensed', 'DIN Alternate', 'Roboto Condensed', sans-serif;
+  --font-body: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-data: 'Cascadia Mono', Consolas, ui-monospace, monospace;
+
+  /* -- Size scale, px at 1080p (DESIGN.md §2) — no sizes outside this set. -- */
+  --font-size-0: 10px;
+  --font-size-1: 11px;
+  --font-size-2: 13px;
+  --font-size-3: 15px;
+  --font-size-4: 19px;
+  --font-size-5: 23px;
+  --font-size-6: 30px;
+  --font-size-7: 44px;
+
+  /* -- Structural constants (DESIGN.md §3) -- */
+  --hairline-width: 1px;
+  --corner-tick-length: 9px;
+  --corner-tick-opacity: 0.55;
+  --focus-ring-width: 2px;
+  --hangar-grid-step: 26px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--font-size-3);
+  overflow: hidden;
+}
+
+/* World canvas fills the viewport behind the DOM UI (PLAN.md §1: "the interface is HTML over canvas"). */
+#world-canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  z-index: 0;
+  touch-action: none;
+}
+
+/* DOM UI overlay: panels opt back into pointer-events individually (see menu.css). */
+#app-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Telemetry, coordinates, ΔV, tables — always monospaced with tabular figures (DESIGN.md §2). */
+.data,
+.mono {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Service labels (e.g. ALTITUDE, THROTTLE, ΔV) — mono, uppercase, tracked, muted (DESIGN.md §2). */
+.label {
+  font-family: var(--font-data);
+  font-size: var(--font-size-1);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+
+/* Keyboard focus must always be visible (DESIGN.md §3): 2px Orbit ring, inset. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-orbit);
+  outline-offset: -2px;
+}

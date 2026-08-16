@@ -1,0 +1,22 @@
+{
+  "MENU_TITLE": "Kármán",
+  "MENU_NEW_FLIGHT": "Новый полёт",
+  "MENU_CONTINUE": "Продолжить",
+  "MENU_HANGAR": "Ангар",
+  "MENU_LOAD": "Загрузить",
+  "MENU_SAVE": "Сохранить",
+  "MENU_SETTINGS": "Настройки",
+  "MENU_EXIT": "Выход",
+  "MENU_LANGUAGE": "Язык",
+  "MENU_THEME": "Тема",
+  "MENU_VERSION": "Версия",
+  "COMMON_OK": "ОК",
+  "COMMON_CANCEL": "Отмена",
+  "COMMON_BACK": "Назад",
+  "COMMON_CLOSE": "Закрыть",
+  "COMMON_YES": "Да",
+  "COMMON_NO": "Нет",
+  "COMMON_LOADING": "Загрузка…",
+  "SETTINGS_THEME_DARK": "Тёмная",
+  "SETTINGS_THEME_LIGHT": "Светлая"
+}

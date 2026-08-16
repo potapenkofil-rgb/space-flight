@@ -1,0 +1,22 @@
+{
+  "MENU_TITLE": "Kármán",
+  "MENU_NEW_FLIGHT": "New Flight",
+  "MENU_CONTINUE": "Continue",
+  "MENU_HANGAR": "Hangar",
+  "MENU_LOAD": "Load",
+  "MENU_SAVE": "Save",
+  "MENU_SETTINGS": "Settings",
+  "MENU_EXIT": "Exit",
+  "MENU_LANGUAGE": "Language",
+  "MENU_THEME": "Theme",
+  "MENU_VERSION": "Version",
+  "COMMON_OK": "OK",
+  "COMMON_CANCEL": "Cancel",
+  "COMMON_BACK": "Back",
+  "COMMON_CLOSE": "Close",
+  "COMMON_YES": "Yes",
+  "COMMON_NO": "No",
+  "COMMON_LOADING": "Loading…",
+  "SETTINGS_THEME_DARK": "Dark",
+  "SETTINGS_THEME_LIGHT": "Light"
+}

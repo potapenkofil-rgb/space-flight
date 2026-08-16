@@ -1,0 +1,49 @@
+{
+  "id": "separator_stack",
+  "name": {
+    "en": "Stack Separator",
+    "ru": "Разделитель стековый"
+  },
+  "description": {
+    "en": "In-line staging separator. Fires and splits the stack in two.",
+    "ru": "Стековый разделитель ступеней. Срабатывает и делит стек надвое."
+  },
+  "category": "separators",
+  "dryMass": 40,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.3,
+  "nodeStrength": 500000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.6,
+    "h": 0.4
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        0.4
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

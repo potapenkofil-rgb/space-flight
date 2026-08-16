@@ -1,0 +1,37 @@
+{
+  "id": "truss_strut",
+  "name": {
+    "en": "Truss (Reinforced, Example Mod)",
+    "ru": "Ферма (усиленная, пример мода)"
+  },
+  "description": {
+    "en": "Example mod override of the base truss: same footprint, denser bracing, higher node strength. See mods/example/ for the format this demonstrates.",
+    "ru": "Пример мода, переопределяющего базовую ферму: тот же профиль, более частые раскосы, выше прочность узла. Формат показан в mods/example/."
+  },
+  "category": "structural",
+  "dryMass": 45,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.12,
+  "nodeStrength": 900000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.3,
+    "h": 1.2
+  },
+  "nodes": [
+    {
+      "pos": [0, 0],
+      "dir": [0, -1],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [0, 1.2],
+      "dir": [0, 1],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

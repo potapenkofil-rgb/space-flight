@@ -1,0 +1,49 @@
+{
+  "id": "reaction_wheel",
+  "name": {
+    "en": "Reaction Wheel",
+    "ru": "Реактивное колесо"
+  },
+  "description": {
+    "en": "Electric torque wheel; provides attitude authority without propellant.",
+    "ru": "Электрический маховик; создаёт момент вращения без расхода топлива."
+  },
+  "category": "control",
+  "dryMass": 90,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.3,
+  "nodeStrength": 400000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1,
+    "h": 1
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        1
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

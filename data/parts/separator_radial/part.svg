@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="12" y="24" width="40" height="16" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="20" y1="24" x2="20" y2="40" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <line x1="44" y1="24" x2="44" y2="40" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+</svg>

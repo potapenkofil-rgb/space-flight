@@ -1,0 +1,23 @@
+{
+  "id": "karman",
+  "bodies": [
+    {
+      "id": "terra",
+      "mu": 9.81e12,
+      "radius": 1000000,
+      "rotationPeriod": 21600,
+      "atmosphere": { "rho0": 1.225, "scaleHeight": 7000, "top": 60000 },
+      "parent": null,
+      "orbit": null
+    },
+    {
+      "id": "luna",
+      "mu": 1.44e11,
+      "radius": 300000,
+      "rotationPeriod": 29483.04,
+      "atmosphere": null,
+      "parent": "terra",
+      "orbit": { "a": 6000000, "e": 0.02, "argPe": 0, "m0": 0, "epoch": 0, "dir": 1 }
+    }
+  ]
+}

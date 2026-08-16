@@ -1,0 +1,37 @@
+{
+  "id": "fairing_nose",
+  "name": {
+    "en": "Nose Fairing",
+    "ru": "Обтекатель"
+  },
+  "description": {
+    "en": "Aerodynamic payload shroud, jettisoned once clear of the atmosphere.",
+    "ru": "Аэродинамический кожух полезной нагрузки, сбрасывается по выходу из атмосферы."
+  },
+  "category": "fairings",
+  "dryMass": 220,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.5,
+  "nodeStrength": 400000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.6,
+    "h": 2.4
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

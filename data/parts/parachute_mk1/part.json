@@ -1,0 +1,37 @@
+{
+  "id": "parachute_mk1",
+  "name": {
+    "en": "Parachute",
+    "ru": "Парашют"
+  },
+  "description": {
+    "en": "Packed drogue-and-main parachute for landing under Terra gravity.",
+    "ru": "Упакованный парашют (вытяжной и основной) для посадки в поле тяготения Терры."
+  },
+  "category": "parachutes",
+  "dryMass": 90,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.4,
+  "nodeStrength": 380000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1,
+    "h": 1.2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

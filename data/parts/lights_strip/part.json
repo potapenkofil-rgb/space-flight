@@ -1,0 +1,37 @@
+{
+  "id": "lights_strip",
+  "name": {
+    "en": "Light Strip",
+    "ru": "Прожектор"
+  },
+  "description": {
+    "en": "Small floodlight strip for night operations and landing.",
+    "ru": "Небольшой прожектор для работы в темноте и посадки."
+  },
+  "category": "lights",
+  "dryMass": 5,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.05,
+  "nodeStrength": 150000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.4,
+    "h": 0.2
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.2,
+        0.1
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 0.5,
+      "kind": "radial"
+    }
+  ]
+}

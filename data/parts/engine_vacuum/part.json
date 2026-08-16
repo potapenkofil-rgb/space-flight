@@ -1,0 +1,45 @@
+{
+  "id": "engine_vacuum",
+  "name": {
+    "en": "Vacuum Engine",
+    "ru": "Вакуумный двигатель"
+  },
+  "description": {
+    "en": "High-Isp upper-stage engine with a wide nozzle bell. Poor at sea level.",
+    "ru": "Двигатель верхней ступени с высоким Isp и широким раструбом. Слаб на уровне моря."
+  },
+  "category": "engines",
+  "dryMass": 470,
+  "resources": [],
+  "engine": {
+    "thrustVac": 60000,
+    "thrustSl": 42000,
+    "ispVac": 318,
+    "ispSl": 208,
+    "gimbalDeg": 4,
+    "minThrottle": 0.2,
+    "fuel": "fuel"
+  },
+  "dragArea": 0.6,
+  "nodeStrength": 520000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.2,
+    "h": 1.6
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        1.6
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 1,
+      "kind": "stack"
+    }
+  ]
+}

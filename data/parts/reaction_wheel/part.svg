@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="12" y="12" width="40" height="40" rx="3" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="13" fill="none" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="32" y1="19" x2="32" y2="45" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <line x1="19" y1="32" x2="45" y2="32" stroke="HairlineSoft" stroke-width="1" fill="none" stroke-linecap="round"/>
+</svg>

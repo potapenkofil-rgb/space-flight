@@ -1,0 +1,49 @@
+{
+  "id": "docking_port",
+  "name": {
+    "en": "Docking Port",
+    "ru": "Стыковочный узел"
+  },
+  "description": {
+    "en": "Androgynous docking port; the mating ring marks the capture face.",
+    "ru": "Универсальный стыковочный узел; кольцо отмечает стыковочную плоскость."
+  },
+  "category": "docking",
+  "dryMass": 40,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.2,
+  "nodeStrength": 300000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.8,
+    "h": 0.4
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        0.4
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 0.6,
+      "kind": "docking"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="22" y="22" width="20" height="20" rx="2" fill="Panel" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="14" cy="32" r="4" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="50" cy="32" r="4" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="14" r="4" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="32" cy="50" r="4" fill="Burn" stroke="InkMuted" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

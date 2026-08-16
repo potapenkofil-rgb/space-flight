@@ -1,0 +1,54 @@
+{
+  "id": "pod_command",
+  "name": {
+    "en": "Command Pod",
+    "ru": "Командный отсек"
+  },
+  "description": {
+    "en": "One-crew command capsule. Small onboard battery, no built-in torque.",
+    "ru": "Одноместная командная капсула. Небольшая батарея на борту, без встроенного момента вращения."
+  },
+  "category": "pod",
+  "dryMass": 950,
+  "resources": [
+    {
+      "id": "electricity",
+      "capacity": 50
+    }
+  ],
+  "engine": null,
+  "dragArea": 0.9,
+  "nodeStrength": 420000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 1.6,
+    "h": 1.8
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0
+      ],
+      "dir": [
+        0,
+        -1
+      ],
+      "size": 1,
+      "kind": "stack"
+    },
+    {
+      "pos": [
+        0,
+        1.8
+      ],
+      "dir": [
+        0,
+        1
+      ],
+      "size": 0.5,
+      "kind": "stack"
+    }
+  ]
+}

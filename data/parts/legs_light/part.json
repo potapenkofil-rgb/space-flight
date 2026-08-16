@@ -1,0 +1,37 @@
+{
+  "id": "legs_light",
+  "name": {
+    "en": "Landing Legs Light",
+    "ru": "Опоры лёгкие"
+  },
+  "description": {
+    "en": "Small spring-damped landing legs for light landers.",
+    "ru": "Лёгкие пружинно-демпферные опоры для небольших посадочных аппаратов."
+  },
+  "category": "legs",
+  "dryMass": 60,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.15,
+  "nodeStrength": 300000,
+  "maxLandingSpeed": 6,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.6,
+    "h": 1
+  },
+  "nodes": [
+    {
+      "pos": [
+        0.3,
+        0.5
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 0.5,
+      "kind": "radial"
+    }
+  ]
+}

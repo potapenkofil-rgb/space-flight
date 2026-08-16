@@ -1,0 +1,49 @@
+{
+  "id": "separator_radial",
+  "name": {
+    "en": "Radial Separator",
+    "ru": "Разделитель радиальный"
+  },
+  "description": {
+    "en": "Side-mount separator plate for radial boosters.",
+    "ru": "Боковая пластина-разделитель для радиальных ускорителей."
+  },
+  "category": "separators",
+  "dryMass": 35,
+  "resources": [],
+  "engine": null,
+  "dragArea": 0.25,
+  "nodeStrength": 450000,
+  "maxLandingSpeed": 0,
+  "crossfeed": false,
+  "bounds": {
+    "w": 0.8,
+    "h": 0.4
+  },
+  "nodes": [
+    {
+      "pos": [
+        0,
+        0.2
+      ],
+      "dir": [
+        -1,
+        0
+      ],
+      "size": 1,
+      "kind": "radial"
+    },
+    {
+      "pos": [
+        0.8,
+        0.2
+      ],
+      "dir": [
+        1,
+        0
+      ],
+      "size": 1,
+      "kind": "radial"
+    }
+  ]
+}

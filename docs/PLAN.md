@@ -11,317 +11,361 @@
 
 | Решение | Выбор |
 |---|---|
-| Движок | Godot 4.4+ (.NET-сборка), C# / .NET 8 |
+| Стек | TypeScript 5 (strict) + Canvas2D, сборка Vite, упаковка в `.exe` через Tauri 2 |
 | Физика | Patched conics — аппарат всегда в сфере влияния одного тела |
-| Объём v1 | Вертикальный срез: собрал → взлетел → вышел на орбиту → слетал к Луне → сел |
 | Соединения | Жёсткие связи, узел ломается при превышении предела прочности |
-| Арт | Чертёжный вектор (SVG), тонкая обводка, оранжевый только у сопла и разъёмов |
+| Арт | Чертёжный вектор, тонкая обводка, оранжевый только у сопла и разъёмов |
 | Язык | Русский + английский, переключение без перезапуска |
+| Объём v1 | Ядро (сборка → полёт → орбита) + узлы манёвра и Луна + сохранения, варп, несколько аппаратов |
 | Сверх SFS | Чёрный ящик с перемоткой · Флайт-план и ΔV в ангаре · Моды без кода |
 | Процесс | Скелет делает один агент, дальше 6 агентов параллельно по подсистемам |
 
-Аэродинамический нагрев, разрушение от перегрева, карьера/контракты, автопилот,
-межпланетные перелёты — **осознанно не входят в v1**, см. §9.
+Обучающий туториал, карьера, автопилот, аэродинамический нагрев — **не входят в v1**, см. §10.
 
 ---
 
-## 1. Структура репозитория
+## 1. Почему такой стек
+
+Три следствия выбора, на которых держится весь план:
+
+**Числа в JS уже double.** Радиус планеты 10⁶ м не создаёт проблем с точностью, которые
+были бы на `float`. Отдельного типа для двойной точности не нужно, но плавающее начало
+координат при отрисовке всё равно обязательно (§2.1).
+
+**Интерфейс — это HTML поверх canvas.** Мир (планеты, ракета, орбиты) рисуется в
+`<canvas>`, а все панели, шкалы и ридауты — обычный DOM с CSS. Это значит, что
+референс дизайна переносится в игру буквально: те же CSS-переменные, те же шрифты,
+та же вёрстка. Не нужно воспроизводить типографику средствами игрового движка.
+
+**Агент может проверить свою работу сам.** `vitest` гоняет ядро без браузера,
+Playwright с предустановленным Chromium открывает собранную игру, кликает и снимает
+скриншот. Задача «сделал и не посмотрел» здесь не проходит — это заложено в критерии
+приёмки.
+
+Tauri на Windows использует системный WebView2 (есть в Win10 из коробки с 2022 г.).
+Установщик обязан включать оффлайн-бутстрап WebView2 для машин без него.
+
+---
+
+## 2. Структура репозитория
 
 ```
 karman/
-├─ Karman.sln
-├─ src/
-│  ├─ Karman.Core/                 ← чистый C#, НОЛЬ ссылок на Godot
-│  │  ├─ Math/                     Vec2 (double), MathD, Units
-│  │  ├─ Orbits/                   Orbit, Kepler, CelestialBody, TrajectoryPredictor
-│  │  ├─ Vessels/                  PartDef, PartInstance, Vessel, MassSolver,
-│  │  │                            FuelFlow, StructuralSolver, Staging, DeltaV
-│  │  ├─ Flight/                   Integrator, Environment, Contact, TimeWarp
-│  │  ├─ Data/                      загрузчики JSON, валидатор, PartLibrary, SystemLibrary
-│  │  └─ Recording/                FlightRecorder, Snapshot, Replay
-│  └─ Karman.Game/                 ← проект Godot, ссылается на Core
-│     ├─ project.godot
-│     ├─ scenes/                   Main, Menu, Build, Flight, Map
-│     ├─ UI/                       Palette.cs, karman_theme.tres, виджеты
-│     ├─ Render/                   SvgPartRenderer, OrbitRenderer, FloatingOrigin
-│     ├─ i18n/                     ui.csv
-│     └─ data/                     parts/, systems/   (базовый контент)
-├─ tests/
-│  └─ Karman.Core.Tests/           xunit, гоняется в CI без Godot
-├─ mods/                           пользовательские папки, читаются поверх data/
-└─ docs/                           PLAN.md, DESIGN.md
+├─ package.json                 pnpm workspaces
+├─ packages/
+│  ├─ core/                     @karman/core — чистый TS, НОЛЬ обращений к DOM
+│  │  └─ src/
+│  │     ├─ math/               vec2, mathx, units
+│  │     ├─ orbits/             orbit, kepler, body, predictor
+│  │     ├─ vessels/            part, vessel, mass, fuel, structure, staging, deltav
+│  │     ├─ flight/             integrator, environment, contact, timewarp
+│  │     ├─ data/               загрузчики и валидаторы JSON/SVG, библиотеки
+│  │     ├─ recording/          recorder, snapshot, replay
+│  │     └─ saves/              сериализация мира и чертежей
+│  └─ app/                      @karman/app — Vite-приложение
+│     └─ src/
+│        ├─ main.ts             точка входа, главный цикл
+│        ├─ scenes/             menu/, build/, flight/, map/
+│        ├─ render/             camera, world-renderer, part-renderer, orbit-renderer
+│        ├─ ui/                 tokens.css, tokens.ts, виджеты, панели
+│        ├─ input/              карта клавиш, мышь
+│        └─ i18n/               ru.json, en.json, t()
+├─ src-tauri/                   Rust-оболочка, иконки, конфиг сборки
+├─ data/                        parts/, systems/     — базовый контент
+├─ mods/                        пользовательские папки, читаются поверх data/
+├─ tests/e2e/                   Playwright
+└─ docs/                        PLAN.md, DESIGN.md
 ```
 
-**Почему `Karman.Core` без Godot.** Вся орбитальная математика и динамика юнит-тестируется
-обычным `dotnet test` в CI — без запуска движка, без графики, за секунды. Это же даёт
-детерминизм, на котором держится чёрный ящик. Ссылка на `Godot` в `Karman.Core`
-запрещена и проверяется тестом.
+**`@karman/core` не обращается к DOM.** Ни `document`, ни `window`, ни `Image`,
+ни `performance.now()`. Вся симуляция юнит-тестируется в node без браузера, за секунды.
+На это есть тест-страж, который грепает пакет.
 
 ---
 
-## 2. Архитектурные решения, от которых нельзя отступать
+## 3. Архитектурные решения, от которых нельзя отступать
 
-### 2.1 Двойная точность и плавающее начало координат
+### 3.1 Плавающее начало координат
 
-Радиус планеты — 10⁶ м. `float` (7 значащих цифр) даёт на такой дистанции шаг сетки
-в десятки сантиметров: ракета будет дрожать на старте. Поэтому:
+Мир в метрах, canvas в пикселях. Позиции переводятся камерой:
+`screen = (world − camera.anchor) · camera.pixelsPerMeter + viewportCenter`.
+`anchor` пересдвигается, когда камера уходит дальше 10 000 м от текущего якоря.
+В `ctx.setTransform` никогда не попадают числа порядка 10⁶ — иначе сглаживание линий
+и пунктир начинают дрожать.
 
-- вся симуляция в `Karman.Core` — на `double`, свой тип `Vec2`;
-- перед отрисовкой позиции переводятся в систему координат камеры
-  (`FloatingOrigin`: `renderPos = (worldPos - cameraAnchor) * pixelsPerMeter`), и только
-  здесь становятся `float`;
-- `cameraAnchor` пересчитывается, когда камера уезжает дальше 4096 единиц от текущего якоря.
+### 3.2 Фиксированный шаг, отвязанный от кадров
 
-### 2.2 Два режима движения и переход между ними
+```
+accumulator += min(realDeltaSeconds, 0.25)      // clamp: не догоняем после сворачивания окна
+while (accumulator >= DT) { sim.step(DT); accumulator -= DT; tick++ }
+render(alpha = accumulator / DT)                // интерполяция позиций между тиками
+```
+
+`DT = 1/60`. Симуляция **никогда** не зависит от частоты кадров. `render` не имеет
+права менять состояние мира — это проверяется тестом: два прогона с разным числом
+вызовов `render` дают побитово одинаковое состояние.
+
+### 3.3 Два режима движения
 
 | Режим | Когда | Как считается |
 |---|---|---|
-| **Свободный** (off-rails) | двигатель работает, ИЛИ высота < границы атмосферы, ИЛИ аппарат на грунте, ИЛИ варп ≤ 10× | численное интегрирование, шаг 1/60 с, симплектический Верле |
+| **Свободный** (off-rails) | двигатель работает, ИЛИ высота ниже потолка атмосферы, ИЛИ аппарат на грунте, ИЛИ варп ≤ 10× | численное интегрирование, шаг 1/60, симплектический Верле |
 | **На рельсах** (on-rails) | иначе | аналитический Кеплер: позиция считается прямо из времени |
 
-Переход off→on: `Kepler.FromStateVectors(r, v, μ, t)`. Переход on→off:
-`Kepler.ToStateVectors(orbit, t)`. Оба перехода обязаны быть обратимыми с погрешностью
-не хуже 1e-9 относительно — на это есть тест.
+Переход off→on: `orbitFromState(r, v, mu, t)`. Переход on→off: `stateFromOrbit(orbit, t)`.
+Оба обязаны быть обратимыми с относительной погрешностью не хуже 1e-9 — на это есть тест.
 
-Рельсы — единственный способ дать варп ×100000 без развала орбиты. Численное
-интегрирование на таком варпе накапливает ошибку и роняет перицентр.
+Рельсы — единственный способ дать варп ×100 000 без развала орбиты: численное
+интегрирование на таком шаге накапливает ошибку и роняет перицентр.
 
-### 2.3 Ракета — одно твёрдое тело, а не связка тел
+**Неактивные аппараты всегда на рельсах.** Их состояние — только орбита плюс время;
+они не интегрируются и не стоят почти ничего. Это то, что делает «несколько аппаратов
+на орбитах» дешёвой фичей, а не подвигом.
 
-Ракета из 200 деталей не моделируется как 200 физических тел с джойнтами. Это источник
-дрожания, «вечных двигателей» на стыках и падения FPS. Вместо этого:
+### 3.4 Ракета — одно твёрдое тело, а не связка тел
+
+Ракета из 200 деталей не моделируется как 200 тел с джойнтами. Это источник дрожания,
+«вечных двигателей» на стыках и падения FPS. Вместо этого:
 
 - ракета — **один жёсткий составной объект**: суммарная масса, центр масс и момент
-  инерции считаются по дереву деталей (`MassSolver`);
-- прочность узлов считается **аналитически**: `StructuralSolver` пробегает граф
-  соединений и для каждого узла суммирует массу «выше по дереву», умножает на текущее
-  ускорение и добавляет аэродинамическую составляющую → получает осевую нагрузку в
-  ньютонах и сравнивает с `node_strength`;
+  инерции считаются по дереву деталей;
+- прочность узлов считается **аналитически**: для каждого узла суммируется масса
+  поддерева, умножается на текущее ускорение, добавляется аэродинамическая
+  составляющая → осевая нагрузка в ньютонах против `nodeStrength`;
 - при превышении узел рвётся, граф деталей делится на компоненты связности,
-  каждая становится **отдельным `Vessel`** со своими наследуемыми скоростью и вращением.
+  каждая становится **отдельным аппаратом** с унаследованными скоростью и вращением.
 
-Отделение ступени — тот же механизм, только разрыв инициируется игроком, а не нагрузкой.
+Отделение ступени — тот же механизм, только разрыв инициирует игрок, а не нагрузка.
 Один код на оба случая.
 
-### 2.4 Столкновение с грунтом — своё, не через физику Godot
+### 3.5 Контакт с грунтом — свой
 
-Godot 2D-физика на координатах порядка 10⁶ ведёт себя плохо. Контакт считаем сами:
-у каждой детали есть точки контакта (низ корпуса, подошвы опор), для каждой считается
+У каждой детали есть точки контакта (низ корпуса, подошвы опор). Для каждой считается
 высота над поверхностью тела; при проникновении применяется пружинно-демпферная реакция
-и трение. Приземление считается успешным, если вертикальная скорость < `max_landing_speed`
-детали-опоры и угол крена < 15°.
+и трение. Посадка засчитана, если вертикальная скорость меньше `maxLandingSpeed` опор
+и крен меньше 15°. Никаких сторонних физических движков — их поведение на координатах
+порядка 10⁶ непредсказуемо, а нам нужен детерминизм.
 
-### 2.5 Детерминизм и чёрный ящик
+### 3.6 Детерминизм и чёрный ящик
 
-Симуляция обязана быть воспроизводимой: фиксированный шаг, отсутствие обращений к
-`Random` без явного сида, отсутствие зависимости от кадровой частоты и от порядка
-обхода `Dictionary` (везде отсортированные ключи или `List`).
+Требования к симуляции: фиксированный шаг; ни одного вызова `Math.random` без явного
+сида; ни одной зависимости от порядка обхода `Map`/`Set` (везде отсортированные ключи
+или массивы); ни одного обращения к времени ОС внутри `core`.
 
 Запись полёта = **полный снимок состояния раз в 30 с симуляционного времени + поток
 команд игрока с номерами тиков**. Перемотка = взять ближайший снимок слева и прокрутить
 вперёд без отрисовки. Это на два порядка дешевле, чем писать состояние каждый тик.
 
-Ограничение честно фиксируем: побитовая воспроизводимость гарантируется в пределах
-одной машины и одной сборки, между разными CPU/JIT — нет. Для локальной перемотки этого
-достаточно, для сетевой синхронизации — нет (её в v1 и не планируется).
+Честное ограничение: `Math.sin`/`Math.pow` в разных движках JS могут отличаться в
+последнем разряде. В пределах одной машины и одной сборки (Tauri = один WebView2)
+воспроизводимость полная, чего для локальной перемотки достаточно. Для сетевой
+синхронизации — нет, её в v1 и не планируется.
 
-### 2.6 SVG в рантайме
+### 3.7 Деталь рисуется через `Path2D`, а не растеризуется
 
-Godot 4 умеет `Image.LoadSvgFromBuffer(bytes, scale)` (ThorVG). Это то, что делает моды
-без кода возможными: деталь = `part.json` + `part.svg` в папке, без компиляции и без SDK.
+`Path2D` в браузере принимает строку SVG-пути. Значит деталь можно рисовать вектором
+напрямую, без растеризации, без кэша текстур и без потери качества на любом зуме.
 
-- перед растеризацией загрузчик подменяет в тексте SVG имена ролей
-  (`fill="Panel"`) на актуальные hex текущей темы;
-- растеризация кэшируется по ключу `(partId, theme, lodBucket)`;
-- LOD-корзины — фиксированные ступени зума (×0.25, ×1, ×4), не непрерывные,
-  иначе кэш будет промахиваться на каждом кадре зумирования.
+- при загрузке `part.svg` парсится через `DOMParser`, из него достаются фигуры
+  (`path`, `rect`, `circle`, `line`, `polygon` — поддерживаемое подмножество,
+  всё остальное игнорируется с предупреждением в логе);
+- каждая фигура превращается в `Path2D` один раз и кэшируется в определении детали;
+- цвета в SVG задаются **именами ролей** (`fill="Panel"`, `stroke="InkMuted"`),
+  при отрисовке подставляется актуальный hex темы — один файл работает в обеих темах
+  и в модах;
+- толщина обводки задаётся в мире, но рисуется в экранных пикселях
+  (`ctx.lineWidth = base / pixelsPerMeter` при отключённом масштабировании линий),
+  чтобы деталь не «жирнела» при зуме.
+
+Парсинг SVG живёт в `@karman/app`, а не в `core` — `DOMParser` есть только в браузере.
+`core` хранит только сырую строку и метаданные.
 
 ---
 
-## 3. Контракты между модулями
+## 4. Контракты между модулями
 
 Их пишет агент 0 **до** начала параллельной работы. Дальше сигнатуры не меняются без
-согласования — на них завязаны шесть агентов сразу. Всё в `Karman.Core`.
+согласования — на них завязаны шесть агентов сразу.
 
-```csharp
-// ── Математика ────────────────────────────────────────────────────────────────
-public readonly struct Vec2 {
-    public readonly double X, Y;
-    public double Length { get; }  public double LengthSquared { get; }
-    public Vec2 Normalized { get; }  public Vec2 Rotated(double rad);
-    public static double Dot(Vec2 a, Vec2 b);  public static double Cross(Vec2 a, Vec2 b);
+```ts
+// ── math ──────────────────────────────────────────────────────────────────────
+export interface Vec2 { readonly x: number; readonly y: number }
+export const v2: {
+  add(a: Vec2, b: Vec2): Vec2;  sub(a: Vec2, b: Vec2): Vec2;
+  scale(a: Vec2, k: number): Vec2;  len(a: Vec2): number;  len2(a: Vec2): number;
+  norm(a: Vec2): Vec2;  rot(a: Vec2, rad: number): Vec2;
+  dot(a: Vec2, b: Vec2): number;  cross(a: Vec2, b: Vec2): number;
+};
+
+// ── orbits ────────────────────────────────────────────────────────────────────
+export interface Orbit {
+  readonly a: number;          // большая полуось, м; < 0 для гиперболы
+  readonly e: number;          // эксцентриситет
+  readonly argPe: number;      // аргумент перицентра, рад
+  readonly m0: number;         // средняя аномалия на эпоху, рад
+  readonly epoch: number;      // t₀, с
+  readonly mu: number;         // μ тела, м³/с²
+  readonly dir: 1 | -1;        // направление обращения
+}
+export function orbitFromState(r: Vec2, v: Vec2, mu: number, t: number): Orbit;
+export function stateFromOrbit(o: Orbit, t: number): { r: Vec2; v: Vec2 };
+export function eccentricAnomaly(meanAnomaly: number, e: number): number;
+export function apoapsis(o: Orbit): number;      // м от центра тела
+export function periapsis(o: Orbit): number;
+export function period(o: Orbit): number;        // NaN при e ≥ 1
+export function timeToTrueAnomaly(o: Orbit, nu: number, from: number): number;
+
+export interface Body {
+  readonly id: string;
+  readonly mu: number; readonly radius: number; readonly soiRadius: number;
+  readonly rotationPeriod: number;
+  readonly atmosphere: Atmosphere | null;
+  readonly parent: Body | null; readonly orbit: Orbit | null;
+  positionAt(t: number): Vec2;   // абсолютная, по цепочке родителей
+  velocityAt(t: number): Vec2;
+}
+export interface Atmosphere { readonly rho0: number; readonly scaleHeight: number; readonly top: number }
+
+export type SegmentEnd = 'soi-entry' | 'soi-exit' | 'impact' | 'escape' | 'time-limit';
+export interface ConicSegment {
+  readonly bodyId: string; readonly orbit: Orbit;
+  readonly startTime: number; readonly endTime: number;
+  readonly endReason: SegmentEnd; readonly nextBodyId: string | null;
+}
+export interface TrajectoryPredictor {
+  predict(state: VesselState, horizonSeconds: number, maxSegments: number): ConicSegment[];
 }
 
-// ── Орбиты ────────────────────────────────────────────────────────────────────
-public readonly struct Orbit {
-    public double SemiMajorAxis;        // a, м; < 0 для гиперболы
-    public double Eccentricity;         // e
-    public double ArgumentOfPeriapsis;  // ω, рад
-    public double MeanAnomalyAtEpoch;   // M₀, рад
-    public double Epoch;                // t₀, с
-    public double Mu;                   // μ тела, м³/с²
-    public int Direction;               // +1 против часовой, −1 по часовой
+// ── детали и аппарат ──────────────────────────────────────────────────────────
+export type NodeKind = 'stack' | 'radial' | 'docking';
+export interface AttachNode { readonly pos: Vec2; readonly dir: Vec2; readonly size: number; readonly kind: NodeKind }
+
+export interface PartDef {
+  readonly id: string;
+  readonly name: LocalizedText; readonly description: LocalizedText;
+  readonly category: PartCategory;
+  readonly dryMass: number;                 // кг
+  readonly resources: ResourceCapacity[];
+  readonly engine: EngineSpec | null;
+  readonly dragArea: number;                // Cd·A, м²
+  readonly nodeStrength: number;            // Н
+  readonly maxLandingSpeed: number;         // м/с, только у опор
+  readonly crossfeed: boolean;
+  readonly nodes: AttachNode[];
+  readonly bounds: { w: number; h: number };  // м
+  readonly art: PartArt;                    // фигуры для Path2D
+}
+export interface EngineSpec {
+  readonly thrustVac: number; readonly thrustSl: number;   // Н
+  readonly ispVac: number; readonly ispSl: number;         // с
+  readonly gimbal: number;                                  // рад
+  readonly minThrottle: number; readonly fuel: string;
 }
 
-public static class Kepler {
-    public static Orbit FromStateVectors(Vec2 r, Vec2 v, double mu, double t);
-    public static (Vec2 R, Vec2 V) ToStateVectors(in Orbit o, double t);
-    public static double EccentricAnomaly(double meanAnomaly, double e);
-    public static double Apoapsis(in Orbit o);      // м от центра тела
-    public static double Periapsis(in Orbit o);
-    public static double Period(in Orbit o);        // NaN для e ≥ 1
-    public static double TimeToTrueAnomaly(in Orbit o, double nu, double fromTime);
+export interface Vessel {
+  readonly id: number;
+  parts: PartInstance[];  joints: JointLink[];  stages: Stage[];  currentStage: number;
+  position: Vec2; velocity: Vec2;      // относительно центра тела SOI
+  rotation: number; angularVelocity: number;
+  soi: Body;  railOrbit: Orbit | null;
+  mass: MassProperties;                // кэш, инвалидируется при расходе/отделении
 }
+export interface MassProperties { readonly total: number; readonly com: Vec2; readonly inertia: number }
 
-public sealed class CelestialBody {
-    public string Id;  public double Mu, Radius, SoiRadius, RotationPeriod;
-    public AtmosphereModel? Atmosphere;
-    public CelestialBody? Parent;  public Orbit? OrbitAroundParent;
-    public Vec2 PositionAt(double t);   // абсолютная, через цепочку родителей
-    public Vec2 VelocityAt(double t);
-}
+// ── системы ───────────────────────────────────────────────────────────────────
+export function computeMass(v: Vessel): MassProperties;
+export function consumeFuel(v: Vessel, dt: number, throttle: number): number;  // → тяга, Н
+export function evaluateStructure(v: Vessel, loads: Loads): JointBreak[];
+export function splitVessel(v: Vessel, breaks: JointBreak[]): Vessel[];
+export function computeDeltaV(v: Vessel, ambientPressure: number): StageDeltaV[];
+export function stepFlight(v: Vessel, dt: number, env: FlightEnvironment, input: ControlInput): void;
 
-public enum SegmentEnd { SoiEntry, SoiExit, Impact, Escape, TimeLimit }
-public readonly struct ConicSegment {
-    public string BodyId; public Orbit Orbit;
-    public double StartTime, EndTime;
-    public SegmentEnd EndReason; public string? NextBodyId;
-}
-public interface ITrajectoryPredictor {
-    IReadOnlyList<ConicSegment> Predict(in VesselState state, double horizonSeconds, int maxSegments);
-}
-
-// ── Детали и аппарат ──────────────────────────────────────────────────────────
-public enum NodeKind { Stack, Radial, Docking }
-public readonly struct AttachNode { public Vec2 LocalPos, Dir; public int Size; public NodeKind Kind; }
-
-public sealed class PartDef {
-    public string Id;  public LocalizedText Name, Description;  public PartCategory Category;
-    public double DryMass;                       // кг
-    public ResourceCapacity[] Resources;         // топливо и окислитель
-    public EngineSpec? Engine;                   // null у неактивных деталей
-    public double DragArea;                      // Cd·A, м²
-    public double NodeStrength;                  // Н, предел на узел
-    public double MaxLandingSpeed;               // м/с, только у опор
-    public AttachNode[] Nodes;
-    public string SvgPath;  public RectD BoundsMeters;
-}
-public sealed class EngineSpec {
-    public double ThrustVacuum, ThrustSeaLevel;  // Н
-    public double IspVacuum, IspSeaLevel;        // с
-    public double GimbalRange;                   // рад
-    public double MinThrottle;                   // 0..1
-    public string FuelResource;
-}
-
-public sealed class Vessel {
-    public IReadOnlyList<PartInstance> Parts;
-    public IReadOnlyList<JointLink> Joints;
-    public IReadOnlyList<Stage> Stages;  public int CurrentStage;
-    public Vec2 Position, Velocity;      // относительно центра тела SOI, м и м/с
-    public double Rotation, AngularVelocity;
-    public CelestialBody Soi;  public Orbit? RailOrbit;
-    public MassProperties Mass;          // кэш, инвалидируется при расходе/отделении
-}
-public readonly struct MassProperties { public double Total; public Vec2 CenterOfMass; public double Inertia; }
-
-// ── Системы ───────────────────────────────────────────────────────────────────
-public interface IMassSolver      { MassProperties Compute(Vessel v); }
-public interface IFuelFlow        { double Consume(Vessel v, double dt, double throttle); } // → фактическая тяга, Н
-public interface IStructuralSolver{ IReadOnlyList<JointBreak> Evaluate(Vessel v, in Loads loads); }
-public interface IStagingService  { Vessel[] Split(Vessel v, IReadOnlyList<JointBreak> breaks); }
-public interface IDeltaVCalculator{ StageDeltaV[] Compute(Vessel v, double ambientPressure); }
-public interface IIntegrator      { void Step(Vessel v, double dt, in FlightEnvironment env, in ControlInput input); }
-public interface IPartLibrary     { PartDef Get(string id); IReadOnlyList<PartDef> All { get; } }
-public interface ISystemLibrary   { CelestialBody Root { get; } CelestialBody Get(string id); }
-public interface IFlightRecorder  { void Tick(long tick, Vessel[] vessels, in ControlInput input);
-                                    IReplaySession OpenReplay(); }
+export interface PartLibrary   { get(id: string): PartDef; all(): readonly PartDef[] }
+export interface SystemLibrary { root: Body; get(id: string): Body }
+export interface FlightRecorder{ tick(t: number, vessels: Vessel[], input: ControlInput): void;
+                                 openReplay(): ReplaySession }
 ```
 
 `VesselState`, `Loads`, `ControlInput`, `FlightEnvironment`, `StageDeltaV`, `JointBreak`,
-`LocalizedText`, `ResourceCapacity`, `AtmosphereModel`, `RectD`, `PartCategory`, `Stage`,
-`JointLink`, `PartInstance`, `IReplaySession` — тоже объявляет агент 0. Все они —
-простые структуры данных без логики.
+`LocalizedText`, `ResourceCapacity`, `PartCategory`, `PartArt`, `Stage`, `JointLink`,
+`PartInstance`, `ReplaySession` объявляет агент 0. Все — простые структуры без логики.
+
+Настройки строгости TS: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`,
+`noImplicitOverride`. `any` запрещён линтером.
 
 ---
 
-## 4. Физическая модель: формулы и константы
+## 5. Физическая модель: формулы и константы
 
-### 4.1 Гравитация и орбиты
+### 5.1 Гравитация и сферы влияния
 
 Ускорение: `a = −μ · r̂ / |r|²`, где `r` — вектор от центра тела SOI.
 
-Смена сферы влияния: аппарат покидает SOI при `|r| > body.SoiRadius`, входит в дочернюю
-при `|r − r_child| < child.SoiRadius`. При смене пересчитываются координаты и скорость
-относительно нового тела: `r' = r − r_child`, `v' = v − v_child`.
+Аппарат покидает SOI при `|r| > body.soiRadius`, входит в дочернюю при
+`|r − r_child| < child.soiRadius`. При смене координаты пересчитываются относительно
+нового тела: `r' = r − r_child`, `v' = v − v_child`.
 
 Радиус SOI: `R_soi = a · (μ_body / μ_parent)^0.4`.
 
-### 4.2 Атмосфера
+### 5.2 Атмосфера
 
-Экспоненциальная модель: `ρ(h) = ρ₀ · exp(−h / H)`, обрезается нулём выше `h_top`.
-Сила сопротивления: `F_drag = ½ · ρ · v² · Σ(Cd·A)`, направлена против вектора скорости
-**относительно вращающейся атмосферы**, а не против инерциальной скорости — иначе на
-экваторе стартующая ракета получает несуществующий боковой снос.
+`ρ(h) = ρ₀ · exp(−h / H)`, обрезается нулём выше потолка.
+Сопротивление: `F = ½ · ρ · v² · Σ(Cd·A)`, направлено против скорости **относительно
+вращающейся атмосферы**, а не против инерциальной — иначе стартующая ракета получает
+несуществующий боковой снос.
 
 Тяга и удельный импульс интерполируются по давлению:
 `F = lerp(F_sl, F_vac, 1 − p/p₀)`, так же `Isp`.
 
-Подъёмная сила и угол атаки в v1 не моделируются (см. §9).
+Подъёмная сила и угол атаки в v1 не моделируются (§10).
 
-### 4.3 Расход топлива
+### 5.3 Расход топлива
 
-`ṁ = F / (Isp · g₀)`, `g₀ = 9.80665` (константа Циолковского, не локальная гравитация —
-частая ошибка).
+`ṁ = F / (Isp · g₀)`, где `g₀ = 9.80665` — константа Циолковского, **не** локальная
+гравитация. Это классическая ошибка, из-за которой ΔV на Луне «улучшается».
 
-Перетекание: топливо тянется вверх по дереву от двигателя через узлы `Stack`, если у
-детали `crossfeed: true`. Радиальные баки (`Radial`) отдают топливо только явно
-подключённым двигателям. Порядок обхода — детерминированный (по `PartInstance.Id`).
+Перетекание: топливо тянется вверх по дереву от двигателя через узлы `stack`, если у
+детали `crossfeed: true`. Радиальные баки отдают топливо только явно подключённым
+двигателям. Порядок обхода детерминированный — по `id` детали.
 
-### 4.4 ΔV ступени
+### 5.4 ΔV ступени
 
-`ΔV = Isp · g₀ · ln(m_start / m_end)`, где `m_start` — масса всей ракеты на момент
-работы ступени, `m_end` — она же за вычетом топлива, сожжённого этой ступенью.
-Считается **дважды**: в вакууме и на уровне моря; в ангаре показываются оба числа,
-в полёте — по текущему давлению.
+`ΔV = Isp · g₀ · ln(m_start / m_end)`. Считается дважды — в вакууме и на уровне моря.
+В ангаре показываются оба числа, в полёте — по текущему давлению.
 
-### 4.5 Вращение
+### 5.5 Вращение
 
-Момент от трёх источников: гимбал двигателя (`τ = F · sin(gimbal) · d`, где `d` —
-плечо от центра масс), RCS-блоки, аэродинамические рули в атмосфере.
-Угловое ускорение `ε = τ / I`, где `I` — момент инерции из `MassSolver`.
-Демпфирование при включённом SAS — ПД-регулятор по ошибке угла, коэффициенты в данных.
+Момент от трёх источников: гимбал двигателя (`τ = F · sin(gimbal) · d`, `d` — плечо от
+центра масс), RCS-блоки, аэродинамические рули в атмосфере. Угловое ускорение
+`ε = τ / I`. При включённом SAS — ПД-регулятор по ошибке угла, коэффициенты в данных.
 
-### 4.6 Прочность
+### 5.6 Прочность
 
-Для каждого узла: `F_axial = m_above · |a| + F_aero_above`, где `m_above` — суммарная
-масса поддерева, `a` — текущее линейное ускорение аппарата.
-Узел ломается при `F_axial > node_strength`. Прочность стыка двух деталей —
-минимум из двух `node_strength`.
+Для узла: `F_axial = m_поддерева · |a| + F_aero_поддерева`. Рвётся при
+`F_axial > nodeStrength`. Прочность стыка двух деталей — минимум из двух значений.
 
-### 4.7 Система v1 (файл `data/systems/karman.json`)
+### 5.7 Система v1 — `data/systems/karman.json`
 
 | Тело | Радиус | μ (м³/с²) | g₀ пов. | Орбита | Атмосфера |
 |---|---|---|---|---|---|
-| **Terra** | 1 000 000 м | 9.81 · 10¹² | 9.81 м/с² | — (корень) | ρ₀ 1.225, H 7 000 м, потолок 60 000 м |
+| **Terra** | 1 000 000 м | 9.81 · 10¹² | 9.81 м/с² | корень | ρ₀ 1.225, H 7 000 м, потолок 60 000 м |
 | **Luna** | 300 000 м | 1.44 · 10¹¹ | 1.60 м/с² | a = 6 000 000 м, e = 0.02 | нет |
 
 Проверочные величины, по которым тюнится баланс деталей:
 
 - круговая орбита 100 км: **2 986 м/с**, с потерями от старта ≈ **3 800 м/с**;
 - отлёт к Луне с орбиты 100 км: **≈ 896 м/с**;
-- SOI Луны: **1 108 000 м**; период обращения Луны: **≈ 8.2 ч**;
+- SOI Луны: **1 108 000 м**; период обращения Луны ≈ **8.2 ч**;
 - линия Кармана (отметка на альтиметре): **50 000 м**.
 
-Солнце в v1 — только источник направления света, гравитационно не участвует.
-Формат системы уже поддерживает цепочку родителей, поэтому добавляется позже без
-переписывания.
+Солнце в v1 — только направление света, гравитационно не участвует. Формат уже
+поддерживает цепочку родителей, поэтому добавляется позже без переписывания.
 
 ---
 
-## 5. Форматы данных
+## 6. Форматы данных
 
-### 5.1 Деталь — `data/parts/<id>/part.json` + `part.svg`
+### 6.1 Деталь — `data/parts/<id>/part.json` + `part.svg`
 
 ```jsonc
 {
@@ -329,12 +373,12 @@ public interface IFlightRecorder  { void Tick(long tick, Vessel[] vessels, in Co
   "name":        { "en": "Fuel Tank S", "ru": "Бак малый" },
   "description": { "en": "...",         "ru": "..." },
   "category": "tanks",
-  "dry_mass": 300,
+  "dryMass": 300,
   "resources": [ { "id": "fuel", "capacity": 2700 } ],
-  "drag_area": 1.4,
-  "node_strength": 480000,
+  "dragArea": 1.4,
+  "nodeStrength": 480000,
   "crossfeed": true,
-  "bounds_m": { "w": 1.6, "h": 3.2 },
+  "bounds": { "w": 1.6, "h": 3.2 },
   "nodes": [
     { "pos": [0,  1.6], "dir": [0,  1], "size": 1, "kind": "stack" },
     { "pos": [0, -1.6], "dir": [0, -1], "size": 1, "kind": "stack" },
@@ -343,253 +387,238 @@ public interface IFlightRecorder  { void Tick(long tick, Vessel[] vessels, in Co
 }
 ```
 
-Двигатель добавляет блок `"engine": { "thrust_vac": .., "thrust_sl": .., "isp_vac": ..,
-"isp_sl": .., "gimbal_deg": .., "min_throttle": .., "fuel": "fuel" }`.
+Двигатель добавляет блок `"engine": { "thrustVac", "thrustSl", "ispVac", "ispSl",
+"gimbalDeg", "minThrottle", "fuel" }`.
 
-### 5.2 Приоритет загрузки и моды
+`part.svg` — обычный SVG с `viewBox="0 0 64 64"`, цвета именами ролей. Ось Y вверх по
+ракете, начало координат — нижний присоединительный узел.
+
+### 6.2 Приоритет загрузки и моды
 
 `data/` грузится первым, затем каждая папка из `mods/` в алфавитном порядке.
 Совпадение `id` — переопределение с записью в лог. Битая деталь **не роняет игру**:
-валидатор пишет понятную ошибку (`ERR_PART_INVALID_NODE`), деталь пропускается,
-в главном меню появляется значок «моды с ошибками» со списком.
+валидатор пишет понятную ошибку (`ERR_PART_INVALID_NODE`), деталь пропускается, в меню
+появляется значок «моды с ошибками» со списком.
 
-### 5.3 Сохранения
+### 6.3 Сохранения
 
-- Чертёж: `saves/blueprints/<name>.json` — список деталей, соединений, ступеней.
-- Мир: `saves/worlds/<name>/world.json` — время, все аппараты, их орбиты/состояния.
-- Запись полёта: `saves/worlds/<name>/flight_<n>.rec` — бинарный поток снимков и команд.
+- Чертёж: `saves/blueprints/<name>.json` — детали, соединения, ступени.
+- Мир: `saves/worlds/<name>/world.json` — время, все аппараты, их орбиты и состояния.
+- Запись полёта: `saves/worlds/<name>/flight_<n>.json` — снимки и поток команд.
 
-Первые два — читаемый форматированный JSON. Это отладочный инструмент: сломанную орбиту
-можно посмотреть глазами и починить руками.
+Всё в читаемом форматированном JSON: сломанную орбиту можно посмотреть глазами и
+починить руками. Пути через Tauri FS API, в dev-режиме — `localStorage` с тем же
+интерфейсом, чтобы игра запускалась в браузере для тестов.
 
 ---
 
-## 6. Этапы и распределение по агентам
+## 7. Этапы и распределение по агентам
 
 ### Этап 0 — Скелет (один агент, все остальные ждут)
 
-**Задача.** Собрать каркас, в котором всё компилируется и все контракты существуют
-хотя бы заглушками.
+1. pnpm-воркспейс, `@karman/core` и `@karman/app`, Vite, Vitest, TS strict, ESLint.
+   `pnpm build`, `pnpm test`, `pnpm lint` проходят.
+2. `src-tauri` со сборкой в `.exe` (сама сборка под Windows в CI не гоняется, но конфиг
+   и иконки на месте, `tauri build` описан в README).
+3. **Все типы и функции из §4 объявлены** — с телами `throw new Error('not implemented')`,
+   но с полными сигнатурами и TSDoc.
+4. `math/` (`v2`, `mathx`, `units`) — **реализован полностью**, это фундамент,
+   заглушкой оставлять нельзя. С тестами.
+5. `ui/tokens.css` + `ui/tokens.ts` со всеми токенами из `DESIGN.md`, переключение темы
+   и чтение цветов для canvas.
+6. `i18n/` с `t()`, `ru.json`, `en.json` (20 базовых ключей), переключение языка в меню.
+7. Главный цикл §3.2, камера с плавающим началом координат §3.1, пустая сцена с
+   планетой и звёздами.
+8. Playwright: `tests/e2e/smoke.spec.ts` — игра стартует, меню видно, скриншот снят.
+9. CI: `pnpm lint && pnpm test && pnpm build && pnpm e2e`.
+10. Тест-стражи: в `@karman/core` нет обращений к DOM; в коде вне `i18n/` нет кириллицы.
 
-Результат:
-1. `Karman.sln`, три проекта (`Karman.Core`, `Karman.Game`, `Karman.Core.Tests`),
-   `dotnet build` и `dotnet test` проходят.
-2. Godot-проект открывается, запускается, показывает пустую сцену с главным меню.
-3. **Все типы и интерфейсы из §3 объявлены** — с телами, бросающими
-   `NotImplementedException`, но с полными сигнатурами и XML-документацией.
-4. `Vec2`, `MathD`, `Units` — реализованы полностью (это фундамент, его нельзя оставлять
-   заглушкой) + тесты на них.
-5. `UI/Palette.cs` со всеми токенами из `DESIGN.md` и `karman_theme.tres` под него.
-6. `i18n/ui.csv` с 20 базовыми ключами и рабочим переключением языка в меню.
-7. `FloatingOrigin` и базовая камера с зумом.
-8. CI: GitHub Actions, `dotnet build` + `dotnet test` на push.
-9. Тест-страж: `Karman.Core` не ссылается на Godot; в `.cs`/`.tscn` вне `i18n/` нет
-   кириллических строк.
-
-**Критерий приёмки.** Клонировать репозиторий, `dotnet test` зелёный, Godot открывает
-проект без ошибок, F5 показывает меню на двух языках.
+**Приёмка:** склонировать, `pnpm i && pnpm test && pnpm e2e` — зелено, скриншот меню
+приложен к отчёту.
 
 ---
 
 ### Далее — шесть агентов параллельно
 
-У каждого своя зона файлов. Пересечение зон — только через контракты из §3.
-**Правило: агент не редактирует файлы вне своей зоны.** Нужна правка в чужой зоне —
-пишет об этом в отчёте, правку делает сборщик.
-
----
+У каждого своя зона файлов. Пересечение — только через контракты §4.
+**Агент не редактирует файлы вне своей зоны.** Нужна чужая правка — пишет в отчёт.
 
 #### Агент A — Орбитальное ядро
-**Зона:** `src/Karman.Core/Orbits/`, `src/Karman.Core/Flight/TimeWarp.cs`,
-`tests/.../Orbits/`
+**Зона:** `packages/core/src/orbits/**`, `packages/core/src/flight/timewarp.ts`, их тесты.
 
-- `Kepler`: `FromStateVectors` / `ToStateVectors` для эллипса, параболы и гиперболы.
-  Решатель уравнения Кеплера — Ньютон с фолбэком на бисекцию (Ньютон расходится при
-  `e → 1` и больших `M`; без фолбэка ловятся зависания на вытянутых орбитах).
-- `CelestialBody.PositionAt/VelocityAt` через цепочку родителей.
-- `TrajectoryPredictor`: цепочка `ConicSegment` вперёд по времени, с поиском пересечения
-  границы SOI (бисекция по времени с точностью 0.01 с) и удара о поверхность.
-- `TimeWarp`: уровни `1, 2, 5, 10, 50, 100, 1 000, 10 000, 100 000`; выше 10× —
-  только на рельсах и вне атмосферы; при попытке — понятный отказ с причиной.
+- Кеплер для эллипса, параболы и гиперболы. Решатель — Ньютон с фолбэком на бисекцию:
+  Ньютон расходится при `e → 1` и больших `M`, без фолбэка ловятся зависания на
+  вытянутых орбитах.
+- `Body.positionAt/velocityAt` по цепочке родителей.
+- `TrajectoryPredictor`: цепочка `ConicSegment` вперёд по времени, поиск пересечения
+  границы SOI бисекцией по времени с точностью 0.01 с, определение удара о поверхность.
+- Варп: `1, 2, 5, 10, 50, 100, 1 000, 10 000, 100 000`; выше 10× — только на рельсах и
+  вне атмосферы, при отказе — причина, а не молчание.
 
-**Тесты (обязательны, иначе задача не принята):**
-- круговая орбита остаётся круговой через 1000 витков на рельсах (Δa < 1e-6 отн.);
-- `state → orbit → state` обратимо для 500 случайных состояний, включая `e > 1`;
-- период эллипса совпадает с `2π√(a³/μ)`;
-- предсказатель ловит вход в SOI Луны на реальной траектории с ΔV = 896 м/с;
-- решатель Кеплера сходится за < 20 итераций при `e = 0.999`.
-
----
+**Тесты обязательны:** круговая орбита остаётся круговой через 1000 витков
+(Δa < 1e-6 отн.); `state → orbit → state` обратимо на 500 случайных состояниях включая
+`e > 1`; период совпадает с `2π√(a³/μ)`; предсказатель ловит вход в SOI Луны на
+траектории с ΔV = 896 м/с; решатель сходится за < 20 итераций при `e = 0.999`.
 
 #### Агент B — Динамика аппарата
-**Зона:** `src/Karman.Core/Vessels/`, `src/Karman.Core/Flight/` (кроме `TimeWarp.cs`),
-`tests/.../Vessels/`
+**Зона:** `packages/core/src/vessels/**`, `packages/core/src/flight/**` кроме `timewarp.ts`.
 
-- `MassSolver`: масса, центр масс, момент инерции по дереву деталей.
-- `FuelFlow`: перетекание по правилам §4.3, детерминированный порядок.
-- `Integrator`: симплектический Верле, шаг 1/60; гравитация, тяга, сопротивление,
-  моменты, контакт с грунтом (§2.4).
-- `StructuralSolver` + `StagingService`: расчёт нагрузок, разрыв узлов, деление графа
-  на компоненты связности, наследование скорости и вращения.
-- `DeltaVCalculator`: ΔV по ступеням в вакууме и на уровне моря, с учётом crossfeed.
+- `computeMass` — масса, центр масс, момент инерции по дереву.
+- `consumeFuel` — перетекание по §5.3, детерминированный порядок.
+- `stepFlight` — симплектический Верле, гравитация, тяга, сопротивление, моменты,
+  контакт с грунтом §3.5.
+- `evaluateStructure` + `splitVessel` — нагрузки, разрыв узлов, деление на компоненты
+  связности, наследование скорости и вращения.
+- `computeDeltaV` — по ступеням, в вакууме и на уровне моря, с учётом crossfeed.
 
-**Тесты:**
-- ракета из одного бака и двигателя с известными массами даёт ΔV, совпадающий с
-  ручным расчётом по Циолковскому (±0.1 %);
-- отделение ступени сохраняет суммарный импульс;
-- разрыв узла на связке из трёх деталей даёт ровно два аппарата с правильными массами;
-- аппарат, стоящий на грунте с выключенным двигателем, не проваливается и не дрожит
-  за 60 с симуляции (смещение < 1 мм);
-- TWR < 1 → ракета не взлетает, высота монотонно не растёт.
-
----
+**Тесты обязательны:** ΔV одноступенчатой ракеты совпадает с ручным расчётом по
+Циолковскому (±0.1 %); отделение сохраняет суммарный импульс; разрыв узла на связке из
+трёх деталей даёт ровно два аппарата с верными массами; аппарат на грунте с выключенным
+двигателем не проваливается и не дрожит за 60 с (смещение < 1 мм); при TWR < 1 высота
+не растёт.
 
 #### Агент C — Ангар (Build)
-**Зона:** `src/Karman.Game/scenes/Build/`, `src/Karman.Game/UI/Build/`
+**Зона:** `packages/app/src/scenes/build/**`, `packages/app/src/ui/build/**`.
 
-- Сетка с примагничиванием к узлам; радиус захвата в экранных пикселях, а не в метрах —
-  иначе на дальнем зуме ничего не поймать.
-- Каталог по категориям, поиск, превью из того же SVG.
-- Симметрия 1 / 2 / 4 / 6, живая: изменение симметрии перестраивает уже поставленные
+- Сетка с примагничиванием к узлам; радиус захвата в **экранных пикселях**, а не в
+  метрах — иначе на дальнем зуме ничего не поймать.
+- Каталог по категориям с поиском, превью тем же вектором, что и на ракете.
+- Симметрия 1 / 2 / 4 / 6, живая: смена симметрии перестраивает уже поставленные
   зеркальные детали, а не только новые.
-- Панель ступеней: перетаскивание, переупорядочивание, ΔV каждой ступени и суммарный.
-- Верхний правый ридаут: масса, тяга/вес, суммарный ΔV, число деталей — обновляется в
-  реальном времени, **пока деталь ещё висит на курсоре**.
-- Проверки перед стартом: центр масс, наличие двигателя, наличие опор, питание —
-  строкой ламп (`Nominal` / `Warning` / `Critical`).
-- **Флайт-план**: панель, где игрок выбирает маршрут из шагов
-  (`Выход на орбиту 100 км` → `Отлёт к Луне` → `Торможение` → `Посадка`), и игра
-  показывает требуемый ΔV на каждый шаг **против имеющегося**. Числа считаются из
-  данных системы (vis-viva + Гоман), а не хардкодятся — иначе флайт-план сломается на
-  первом же моде.
+- Панель ступеней: перетаскивание, переупорядочивание, ΔV каждой и суммарный.
+- Ридаут: масса, тяга/вес, суммарный ΔV, число деталей — обновляется, **пока деталь
+  ещё висит на курсоре**.
+- Проверки перед стартом строкой ламп: центр масс, наличие двигателя, наличие опор,
+  питание.
+- **Флайт-план**: игрок набирает маршрут из шагов (`орбита 100 км` → `отлёт к Луне` →
+  `торможение` → `посадка`), игра показывает требуемый ΔV на каждый шаг против
+  имеющегося. Числа считаются из данных системы (vis-viva + Гоман), **не хардкодятся** —
+  иначе флайт-план сломается на первом же моде.
 - Сохранение и загрузка чертежей.
 
-**Приёмка:** собрать двухступенчатую ракету за < 30 с мышью, увидеть корректный ΔV,
-сохранить, перезапустить игру, загрузить — чертёж идентичен.
+**Приёмка:** Playwright-сценарий собирает двухступенчатую ракету кликами, проверяет
+ΔV в ридауте, сохраняет, перезагружает страницу, загружает — чертёж идентичен.
+Скриншот ангара в отчёте.
 
----
-
-#### Агент D — Полёт и карта (Flight + Map)
-**Зона:** `src/Karman.Game/scenes/Flight/`, `scenes/Map/`, `src/Karman.Game/Render/`,
-`src/Karman.Game/UI/Flight/`
+#### Агент D — Полёт и карта
+**Зона:** `packages/app/src/scenes/flight/**`, `scenes/map/**`, `packages/app/src/render/**`,
+`packages/app/src/ui/flight/**`, `packages/app/src/input/**`.
 
 - HUD строго по `DESIGN.md`: РУД слева вертикальной шкалой, высота и скорость справа,
-  атмосфера/перегрузка слева сверху, строка ламп. Центр не перекрывается.
-- Управление: `Z` полный газ, `X` отсечка, `Shift`/`Ctrl` плавно, `Space` — ступень,
-  `A`/`D` — поворот, `T` — SAS, `,`/`.` — варп. Всё через `InputMap`, переназначаемо.
-- Камера: зум от «видно опоры» до «видно планету целиком», плавное следование,
-  тряска при отделении и при большой тяге.
-- Факел двигателя: длина и прозрачность от газа и давления, в вакууме шире и короче.
-- Карта: отрисовка полилиний по §5 `DESIGN.md`, адаптивная выборка, апо/пери,
-  сфера влияния, переключение фокуса между телами.
-- Узел манёвра: создаётся кликом по орбите, тянется по осям prograde/retrograde и
-  normal-эквиваленту (в 2D — radial in/out), показывает результирующую орбиту пунктиром
-  и «время до», «длительность прожига», «результат».
+  атмосфера и перегрузка слева сверху, строка ламп. Центр экрана не перекрывается.
+- Управление: `Z` полный газ, `X` отсечка, `Shift`/`Ctrl` плавно, `Space` ступень,
+  `A`/`D` поворот, `T` SAS, `,`/`.` варп. Всё через карту клавиш, переназначаемо.
+- Камера: зум от «видно опоры» до «видно планету целиком», плавное следование, тряска
+  при отделении и большой тяге.
+- Факел: длина и прозрачность от газа и давления, в вакууме шире и короче.
+- Карта: полилинии по §5 `DESIGN.md`, адаптивная выборка (чаще у перицентра), апо/пери,
+  сфера влияния, переключение фокуса между телами и между аппаратами.
+- Узел манёвра: ставится кликом по орбите, тянется по prograde/retrograde и
+  radial in/out, показывает результирующую орбиту пунктиром, «время до», «длительность
+  прожига», «результат».
 
 **Приёмка:** от старта до стабильной орбиты 100 км управляется без консоли; узел
-манёвра, поставленный на апоцентре, после исполнения даёт круговую орбиту с
-погрешностью перицентра < 2 км.
-
----
+манёвра на апоцентре после исполнения даёт круговую орбиту с погрешностью перицентра
+< 2 км. Скриншоты HUD и карты в отчёте.
 
 #### Агент E — Контент и данные
-**Зона:** `src/Karman.Game/data/`, `src/Karman.Core/Data/`, `src/Karman.Game/i18n/`
+**Зона:** `data/**`, `mods/example/**`, `packages/core/src/data/**`,
+`packages/app/src/render/part-renderer.ts`, `packages/app/src/i18n/**`.
 
-- Загрузчик и **валидатор** JSON с человеческими сообщениями об ошибках и
-  устойчивостью к битым модам (§5.2).
-- `SvgPartRenderer`: подмена ролей на hex, растеризация, LOD-кэш (§2.6).
-- **25 деталей** по `DESIGN.md`, сбалансированных под систему из §4.7:
-  капсула, 3 бака (S/M/L), 3 двигателя (стартовый/вакуумный/посадочный),
-  твердотопливный ускоритель, разделитель стековый и радиальный, обтекатель,
-  парашют, 2 типа опор, RCS-блок и бак RCS, солнечная панель, батарея,
-  стыковочный узел, переходники размеров, аэродинамические рули, реактивное колесо,
-  лестница, огни, конструкционная ферма.
-- `data/systems/karman.json` с Terra и Luna по числам из §4.7.
-- Полный `ui.csv` на двух языках.
-- Пример мода в `mods/example/` — одна деталь и одна планета, как живая документация.
+- Загрузчик и **валидатор** JSON с человеческими сообщениями и устойчивостью к битым
+  модам §6.2.
+- Парсер SVG → `Path2D` по §3.7, с подменой ролей на hex и поддерживаемым подмножеством
+  фигур.
+- **25 деталей** по `DESIGN.md`, сбалансированных под систему §5.7: капсула, 3 бака
+  (S/M/L), 3 двигателя (стартовый / вакуумный / посадочный), твердотопливный ускоритель,
+  разделители стековый и радиальный, обтекатель, парашют, 2 типа опор, RCS-блок и бак
+  RCS, солнечная панель, батарея, стыковочный узел, 2 переходника размеров,
+  аэродинамические рули, реактивное колесо, лестница, огни, ферма.
+- `data/systems/karman.json` по числам §5.7.
+- Полные `ru.json` / `en.json`.
+- `mods/example/` — одна деталь и одна планета как живая документация.
 
 **Приёмка:** все 25 деталей проходят валидатор; ракета из стартового набора выходит на
-орбиту с запасом ΔV 15–25 % (не впритык и не вдвое) — это и есть проверка баланса.
+орбиту с запасом ΔV 15–25 % — не впритык и не вдвое. Это и есть проверка баланса.
+Контактный лист всех деталей одним скриншотом в отчёте.
 
----
-
-#### Агент F — Чёрный ящик и сохранения
-**Зона:** `src/Karman.Core/Recording/`, `src/Karman.Game/UI/Replay/`,
-`src/Karman.Core/Data/Saves/`
+#### Агент F — Чёрный ящик, сохранения, несколько аппаратов
+**Зона:** `packages/core/src/recording/**`, `packages/core/src/saves/**`,
+`packages/app/src/ui/replay/**`.
 
 - `FlightRecorder`: снимок раз в 30 с симвремени + поток команд с номерами тиков.
-- Перемотка: загрузка ближайшего снимка и прокрутка без отрисовки; целевое время
+- Перемотка: загрузка ближайшего снимка и прокрутка без отрисовки. Целевое время
   перемотки на 10 минут полёта — **менее 2 с**.
-- Таймлайн внизу экрана с отметками событий: старт, отделение, потеря детали,
-  вход в атмосферу, апоцентр, посадка/удар.
-- Графики по записи: высота, скорость, перегрузка, остаток топлива — по времени.
-- «Старт с отметки»: продолжить полёт с любой точки записи, ветвя новую запись.
+- Таймлайн внизу экрана с отметками: старт, отделение, потеря детали, вход в атмосферу,
+  апоцентр, посадка/удар.
+- Графики по записи: высота, скорость, перегрузка, остаток топлива.
+- «Старт с отметки» — продолжить с любой точки, ветвя новую запись.
 - Сохранение и загрузка мира, автосохранение раз в 2 минуты и перед каждым отделением.
+- **Реестр аппаратов**: несколько объектов на орбитах одновременно, неактивные на
+  рельсах §3.3, переключение между ними, список с орбитами.
 
-**Приёмка:** полёт 10 минут, перемотка назад на 5 минут, продолжение — состояние
-совпадает с исходным по всем полям с точностью 1e-9; перезапуск игры и загрузка мира
-дают ту же орбиту.
-
----
+**Приёмка:** полёт 10 минут, перемотка на 5 минут назад, продолжение — состояние
+совпадает с исходным по всем полям с точностью 1e-9; перезагрузка и загрузка мира дают
+ту же орбиту; два аппарата на разных орбитах переживают варп ×10 000.
 
 ### Этап 2 — Сборка и полировка (сборщик, не агенты)
 
-Свести ветки, разрешить конфликты контрактов, прогнать сквозной сценарий из §7,
-выровнять баланс, собрать `.exe` под Windows 10 (x86_64, экспорт из Godot).
+Свести ветки, разрешить конфликты контрактов, прогнать сквозной сценарий §8, выровнять
+баланс, собрать `.exe` под Windows 10 x64 с бутстрапом WebView2.
 
 ---
 
-## 7. Сквозной сценарий приёмки v1
+## 8. Сквозной сценарий приёмки v1
 
 Один проход, без консоли и без правки файлов руками:
 
-1. Запуск `.exe` на Windows 10 → главное меню, переключение RU/EN работает.
-2. Ангар: собрать двухступенчатую ракету из каталога, включить симметрию 2 для
-   ускорителей, увидеть ΔV по ступеням и суммарный.
+1. Запуск `.exe` на Windows 10 → меню, переключение RU/EN работает.
+2. Ангар: собрать двухступенчатую ракету, включить симметрию 2 для ускорителей,
+   увидеть ΔV по ступеням и суммарный.
 3. Флайт-план: выбрать «орбита 100 км → отлёт к Луне», увидеть требуемые 3 800 + 896 м/с
    и вердикт «хватает / не хватает».
-4. Старт: газ, гравитационный разворот вручную, отделение первой ступени.
+4. Старт, газ, гравитационный разворот вручную, отделение первой ступени.
 5. Выход на орбиту 100 км, HUD показывает апо/пери.
-6. Карта: поставить узел манёвра, увидеть пунктирную траекторию к Луне.
-7. Исполнить прожиг, включить варп ×10000, долететь до сферы влияния Луны — переход
-   SOI отрисован и не ломает орбиту.
-8. Сесть на Луну на опорах, вертикальная скорость < допустимой — посадка засчитана.
+6. Карта: узел манёвра, пунктирная траектория к Луне.
+7. Исполнить прожиг, варп ×10 000, дойти до сферы влияния Луны — переход SOI отрисован
+   и не ломает орбиту.
+8. Сесть на Луну на опорах в пределах допустимой вертикальной скорости.
 9. Чёрный ящик: перемотать на момент отделения, посмотреть график перегрузки,
    продолжить с этой отметки.
-10. Сохранить мир, выйти, загрузить — аппарат на той же орбите.
-11. Положить в `mods/` деталь из примера — она появляется в каталоге без перекомпиляции.
+10. Оставить аппарат на орбите, запустить второй, переключиться между ними.
+11. Сохранить мир, выйти, загрузить — оба аппарата на своих орбитах.
+12. Положить деталь из `mods/example/` — появляется в каталоге без пересборки.
 
 ---
 
-## 8. Правила работы агентов
+## 9. Правила работы агентов
 
 - **Ветка** — `claude/spaceflight-simulator-game-6qtxgx`. Коммиты осмысленные,
   по одному на завершённый кусок.
 - **Не выходить за свою зону файлов.** Нужна чужая правка — в отчёт, не в код.
-- **Контракты из §3 не меняются в одностороннем порядке.** Не хватает поля — в отчёт.
-- **Тесты обязательны** там, где они указаны в приёмке агента. Задача без тестов
-  не принята.
-- **Все строки для игрока — через `tr()` или через `LocalizedText`.** Ноль кириллицы
-  в коде и сценах.
-- **Цвета и шрифты — только из `Palette.cs`.** Ни одного hex в коде виджетов.
-- **Никакого `float` в `Karman.Core`.** Только `double`.
-- Отчёт агента: что сделано, что не сделано и почему, какие допущения приняты,
-  что нужно от других агентов.
+- **Контракты §4 не меняются в одностороннем порядке.** Не хватает поля — в отчёт.
+- **Тесты обязательны** там, где указаны в приёмке. Задача без тестов не принята.
+- **Проверяй свою работу сама.** `pnpm test` для ядра, Playwright + скриншот для UI.
+  Отчёт без запущенных тестов не принимается.
+- **Ноль обращений к DOM в `@karman/core`.** Ноль `any`. Ноль кириллицы вне `i18n/`.
+- **Цвета и шрифты только из `tokens.ts` / `tokens.css`.** Ни одного hex в коде виджетов.
+- Отчёт агента: что сделано, что не сделано и почему, какие допущения приняты, что нужно
+  от других агентов.
 
 ---
 
-## 9. Что осознанно не входит в v1
+## 10. Что осознанно не входит в v1
 
-Это не забытое, а отложенное. Перечислено, чтобы никто не начал делать это по своей
-инициативе и не сорвал сроки.
+Перечислено, чтобы никто не начал делать это по своей инициативе и не сорвал сроки.
 
 | Отложено | Почему | Куда потом |
 |---|---|---|
-| Аэродинамический нагрев и разрушение при входе | выбрана база patched conics без термики; HUD-ридауты «нагрев/теплопоток» из референса включаются вместе с этим | v2 |
+| Обучающий туториал | не выбран в объёме v1; требует стабильного UI, который до сборки не устоится | v1.1 |
+| Аэродинамический нагрев и разрушение при входе | выбрана база patched conics без термики; ридауты «нагрев / теплопоток» из референса включаются вместе с этим | v2 |
 | Подъёмная сила, угол атаки | без термики отдельно не имеет смысла | v2 |
-| Карьера, контракты, деньги | требует экономики и дерева разблокировок — отдельный пласт | v2 |
+| Карьера, контракты, деньги | отдельный пласт: экономика плюс дерево разблокировок | v2 |
 | Программируемый автопилот | нужен стабильный API полёта, который появится только после v1 | v2 |
-| Межпланетные перелёты, Солнце как тело | формат системы уже поддерживает, нужен только контент и окно запуска | v2 |
-| Стыковка и станции | стыковочный узел в каталоге есть, логика захвата — нет | v2 |
-| Мультиплеер | детерминизм гарантируется только в пределах одной машины (§2.5) | не планируется |
-| Отказы деталей и наработка | интересно, но ломает обучение новичка на старте | обсуждаемо |
+| Межпланетные перелёты, Солнце как тело | формат системы поддерживает, нужен контент и окно запуска | v2 |
+| Стыковка | стыковочный узел в каталоге есть, логика захвата — самая рискованная часть; делается последней и при нехватке времени режется первой | v1, но режется первой |
+| Мультиплеер | детерминизм гарантируется только в пределах одной машины §3.6 | не планируется |
+| Отказы деталей и наработка | ломает обучение новичка на старте | обсуждаемо |

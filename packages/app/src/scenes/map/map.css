@@ -103,6 +103,7 @@
   color: var(--color-ink);
   font-size: var(--font-size-2);
 }
+.map-node-execute,
 .map-node-delete {
   margin-top: 10px;
   width: 100%;
@@ -116,8 +117,16 @@
   padding: 6px 8px;
   cursor: pointer;
 }
+.map-node-execute:hover,
 .map-node-delete:hover {
   background: var(--color-burn-soft);
+}
+/* Executing the burn is the "energy" action (DESIGN.md §1: Burn = only energy/irreversibility) — filled solid, not just outlined like delete. */
+.map-node-execute {
+  margin-top: 14px;
+  background: var(--color-burn-soft);
+  color: var(--color-burn);
+  font-weight: 600;
 }
 
 /* -- Hint strip: bottom, full width -- */

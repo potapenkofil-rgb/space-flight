@@ -156,9 +156,8 @@
   "MAP_MANEUVER_RADIAL_OUT": "РАДИАЛЬНО НАРУЖУ",
   "MAP_MANEUVER_RADIAL_IN": "РАДИАЛЬНО ВНУТРЬ",
   "MAP_MANEUVER_DELETE": "Удалить узел",
+  "MAP_MANEUVER_EXECUTE": "Выполнить прожиг",
   "MAP_ADD_NODE_HINT": "Клик по орбите — узел манёвра",
   "MAP_BODY_TERRA": "Терра",
-  "MAP_BODY_LUNA": "Луна",
-  "MAP_VESSEL_STATION": "Станция-100",
-  "MAP_VESSEL_PROBE": "Зонд-2"
+  "MAP_BODY_LUNA": "Луна"
 }

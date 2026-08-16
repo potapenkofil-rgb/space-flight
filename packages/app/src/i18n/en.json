@@ -156,9 +156,8 @@
   "MAP_MANEUVER_RADIAL_OUT": "RADIAL OUT",
   "MAP_MANEUVER_RADIAL_IN": "RADIAL IN",
   "MAP_MANEUVER_DELETE": "Delete node",
+  "MAP_MANEUVER_EXECUTE": "Execute burn",
   "MAP_ADD_NODE_HINT": "Click the orbit to place a maneuver node",
   "MAP_BODY_TERRA": "Terra",
-  "MAP_BODY_LUNA": "Luna",
-  "MAP_VESSEL_STATION": "Station-100",
-  "MAP_VESSEL_PROBE": "Probe-2"
+  "MAP_BODY_LUNA": "Luna"
 }

@@ -87,9 +87,12 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
   const ctx: CanvasRenderingContext2D = context;
 
   const session = getSession();
-  const nowTime = session.simTime;
+  // Both reassigned by `executeManeuver` once a burn actually applies — "now"
+  // moves to the node's time and the vessel's displayed orbit becomes its
+  // freshly-computed `railOrbit` (PLAN.md §8 step 7: executing a burn).
+  let nowTime = session.simTime;
   const bodies = listMapBodies();
-  const vessels = listMapVessels(nowTime);
+  let vessels = listMapVessels(nowTime);
   if (bodies.length === 0) throw new Error('mountMapScene: no bodies loaded');
   const predictor = createTrajectoryPredictor(bodies.map((b) => b.body));
 
@@ -226,6 +229,43 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
   const burnTimeRow = nodeRow('map-node-burn-time');
   const deltaVRow = nodeRow('map-node-delta-v');
   const resultRow = nodeRow('map-node-result');
+
+  /**
+   * Executes the planned burn (PLAN.md §8 step 7): applies `node`'s delta-v
+   * to the real vessel as an instantaneous impulse at the node's time — the
+   * same idealization `previewManeuver` already assumes (its `resultOrbit`
+   * *is* the state right after this impulse) — then adopts that as the
+   * vessel's new `railOrbit` and advances the session clock to the node's
+   * time. The vessel stays on-rails afterward, ready for a big warp.
+   */
+  function executeManeuver(): void {
+    const vesselView = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
+    if (!node || !vesselView) return;
+    const preview = previewManeuver(vesselView.orbit, node, nowTime, REAL_ORBIT_KERNEL);
+    const { r, v } = REAL_ORBIT_KERNEL.stateFromOrbit(vesselView.orbit, preview.nodeTime);
+    const progradeDir = v2.norm(v);
+    const radialDir = v2.norm(r);
+    const deltaV = v2.add(v2.scale(progradeDir, node.progradeDeltaV), v2.scale(radialDir, node.radialDeltaV));
+
+    const real = vesselView.vessel;
+    real.position = r;
+    real.velocity = v2.add(v, deltaV);
+    real.railOrbit = preview.resultOrbit;
+
+    session.simTime = preview.nodeTime;
+    nowTime = preview.nodeTime;
+    vessels = listMapVessels(nowTime);
+    node = null;
+    camera = fitCameraToBody(focusBodyId);
+    syncPanels();
+  }
+
+  const executeButton = document.createElement('button');
+  executeButton.type = 'button';
+  executeButton.className = 'map-node-execute';
+  executeButton.dataset['testid'] = 'map-node-execute';
+  executeButton.addEventListener('click', executeManeuver);
+
   const deleteButton = document.createElement('button');
   deleteButton.type = 'button';
   deleteButton.className = 'map-node-delete';
@@ -234,7 +274,7 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
     node = null;
     syncPanels();
   });
-  nodePanel.append(timeToRow.row, burnTimeRow.row, deltaVRow.row, resultRow.row, deleteButton);
+  nodePanel.append(timeToRow.row, burnTimeRow.row, deltaVRow.row, resultRow.row, executeButton, deleteButton);
   nodePanel.style.display = 'none';
 
   // -- DOM: bottom hint strip --
@@ -264,6 +304,7 @@ export function mountMapScene(canvas: HTMLCanvasElement, uiRoot: HTMLElement, na
     hintLeft.textContent = t('MAP_ADD_NODE_HINT');
     hintRight.textContent = t('MAP_FLIGHT_HINT');
     deleteButton.textContent = t('MAP_MANEUVER_DELETE');
+    executeButton.textContent = t('MAP_MANEUVER_EXECUTE');
 
     const vessel = focusVesselId !== null ? vesselById(focusVesselId) : undefined;
     if (!node || !vessel) {

@@ -117,6 +117,21 @@ test('clicking the orbit places a maneuver node with a real ΔV/time-to readout,
   await expect(page.getByTestId('map-node-panel')).toBeHidden();
 });
 
+test('executing a maneuver node applies it and returns to flight cleanly (PLAN.md §8 step 7)', async ({ page }) => {
+  await gotoMapFromFlight(page);
+
+  await placeNodeOnOrbit(page);
+  await expect(page.getByTestId('map-node-panel')).toBeVisible();
+
+  await page.getByTestId('map-node-execute').click();
+  // Executing consumes the node — the readout panel hides again.
+  await expect(page.getByTestId('map-node-panel')).toBeHidden();
+
+  // The vessel is still there and flyable afterward.
+  await page.keyboard.press('m');
+  await expect(page.getByTestId('flight-hud')).toBeVisible();
+});
+
 test('M switches between the flight and map scenes', async ({ page }) => {
   await page.setViewportSize(VIEWPORT);
   await buildMinimalVesselAndLaunch(page);
